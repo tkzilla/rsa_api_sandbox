@@ -292,18 +292,36 @@ def main():
 	ax2.set_zlabel('Amplitude (dBm)')
 	plt.show()
 
-	#This commented section is a 3D representation of the DPXogram bitmap
-	#This is not used directly because the amplitude values must be scaled
-	"""
-	fig1 = plt.figure(figsize=(12,12))
-	time = np.empty(fb.sogramBitmapWidth,)
-	ax1 = fig1.gca(projection='3d')
-	for i in range(validTraces):
-		ax1.plot(bitmapFreq,dpxogramBitmap[i], i, zdir='y')
-		plt.ylim(0,40)
-		ax1.set_zlim(np.amin(dpxogramBitmap),np.amax(dpxogramBitmap))
-	"""
-	
+	"""#################MISC#################"""
+	# sogramSet = DPX_SogramSettingStruct()
+    # rsa.DPX_GetSogramSettings(byref(sogramSet))
+    # timeResolution = sogramSet.sogramTraceLineTime
+
+    # intArray = c_int16*fb.spectrumTraceLength
+    # vData = intArray()
+    # vDataSize = c_int32(0)
+    # dataSF = c_double(0)
+    # validTraces = fb.sogramBitmapNumValidLines
+    # dpxogram = np.empty((validTraces,fb.spectrumTraceLength))
+
+    # for i in range(validTraces):
+    #     rsa.DPX_GetSogramHiResLine(vData, byref(vDataSize), c_int32(i), 
+    #     byref(dataSF), c_int32(fb.spectrumTraceLength), c_int32(0))
+    #     dpxogram[i] = np.array(vData)
+    # dpxogram = dpxogram*dataSF.value
+    
+    # This figure is a 3D representation of the DPX bitmap  
+    # The methodology was patched together from a few Matplotlib example files
+    # If anyone can figure out how to do a 3D colormap, that'd be cool.
+    # ax2 = fig.add_subplot(132, projection='3d')
+    # for i in range(fb.spectrumBitmapHeight):
+    #     index = fb.spectrumBitmapHeight-1-i
+    #     ax2.plot(dpxBitmap[i], dpxFreq, dpxAmp[index], color='b')
+    # ax2.set_title('DPX Bitmap')
+    # ax2.set_zlim(refLevel-100, refLevel)
+    # ax2.set_xlabel('Spectral Density (counter hits)')
+    # ax2.set_ylabel('Frequency (Hz)')
+    # ax2.set_zlabel('Amplitude (dBm)')
 
 	"""#################DISCONNECT#################"""
 	print('\nDisconnecting.')

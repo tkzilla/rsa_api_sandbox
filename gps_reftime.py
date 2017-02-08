@@ -2,7 +2,7 @@
 Tektronix RSA API: GNSS Setup and Testing
 Author: Morgan Allison
 Date Created: 6/16
-Date edited: 1/17
+Date edited: 2/17
 Windows 7 64-bit
 RSA API version 3.9.0029
 Python 3.5.2 64-bit (Anaconda 4.2.0)
@@ -26,8 +26,14 @@ chdir("C:\\Tektronix\\RSA_API\\lib\\x64")
 rsa = cdll.LoadLibrary("RSA_API.dll")
 
 """#################CLASSES AND FUNCTIONS#################"""
+def err_check(returnStatus):
+    if returnStatus != 0:
+        print('Error: {}'.format(returnStatus))
+        print('Exiting script.')
+        exit()
+
+
 def search_connect():
-    #search/connect variables
     numFound = c_int(0)
     intArray = c_int*10
     deviceIDs = intArray()
@@ -35,18 +41,15 @@ def search_connect():
     deviceType = create_string_buffer(8)
     apiVersion = create_string_buffer(16)
 
-    #get API version
     rsa.DEVICE_GetAPIVersion(apiVersion)
     print('API Version {}'.format(apiVersion.value.decode()))
 
-    #search
     ret = rsa.DEVICE_Search(byref(numFound), deviceIDs, 
         deviceSerial, deviceType)
+    err_check(ret)
 
-    if ret != 0:
-        print('Error in Search: ' + str(ret))
-        exit()
     if numFound.value < 1:
+        rsa.DEVICE_Reset(c_int(0))
         print('No instruments found. Exiting script.')
         exit()
     elif numFound.value == 1:
@@ -54,10 +57,9 @@ def search_connect():
         print('Device type: {}'.format(deviceType.value.decode()))
         print('Device serial number: {}'.format(deviceSerial.value.decode()))
         ret = rsa.DEVICE_Connect(deviceIDs[0])
-        if ret != 0:
-            print('Error in Connect: ' + str(ret))
-            exit()
+        err_check(ret)
     else:
+        # corner case
         print('2 or more instruments found. Enumerating instruments, please wait.')
         for inst in range(numFound.value):
             rsa.DEVICE_Connect(deviceIDs[inst])
@@ -71,17 +73,18 @@ def search_connect():
         selection = 1024
         while (selection > numFound.value-1) or (selection < 0):
             selection = int(input('Select device between 0 and {}\n> '.format(numFound.value-1)))
-        rsa.DEVICE_Connect(deviceIDs[selection])
-        return selection
+        ret = rsa.DEVICE_Connect(deviceIDs[selection])
+        err_check(ret)
+    rsa.CONFIG_Preset()
 
 
-def setup_gnss(rsa, system=2):
+def setup_gnss(system=2):
 	#setup variables
 	enable = c_bool(True)
 	powered = c_bool(True)
 	installed = c_bool(False)
+	locked = c_bool(False)
 	msgLength = c_int(0)
-	message = create_string_buffer(256)
 	#1:GPS/GLONASS, 2:GPS/BEIDOU, 3:GPS, 4:GLONASS, 5:BEIDOU
 	satSystem = c_int(system)
 
@@ -98,24 +101,27 @@ def setup_gnss(rsa, system=2):
 		rsa.GNSS_GetEnable(byref(enable))
 		rsa.GNSS_GetAntennaPower(byref(powered))
 		rsa.GNSS_GetSatSystem(byref(satSystem))
+		
+	print('Waiting for GNSS lock.')
+	while locked.value != True:
+		rsa.GNSS_GetStatusRxLock(byref(locked))
+	print('GNSS locked.')
 
 	return installed.value
 
 
-def get_gnss_message(rsa):
+def get_gnss_message():
 	msgLength = c_int(0)
-	message = c_char_p('')
+	message = c_char_p(b'')
 	numMessages = 10
 	gnssMessage = []
 	nmeaMessages = []
 
 	#grab a certain number of GNSS message strings
 	for i in range(numMessages):
-		while msgLength.value == 0:
-			rsa.GNSS_GetNavMessageData(byref(msgLength), byref(message))
-		msgLength.value = 0
+		rsa.GNSS_GetNavMessageData(byref(msgLength), byref(message))
 		#concatenate the new string
-		gnssMessage += message.value
+		gnssMessage.append(message.value.decode('cp1252'))
 	#put all the continuous ascii text together
 	messageString = ''.join(map(str, gnssMessage))
 	#split message based on individual NMEA messages
@@ -124,7 +130,7 @@ def get_gnss_message(rsa):
 		if 'GNGGA' in indivMessages[i]:
 			print(indivMessages[i])
 			try:
-				nmeaMessages.append(pynmea2.parse(indivMessages[i]))
+				nmeaMessages.append(pynmea2.parse(indivMessages[i].rstrip()))
 				print('Latitude: {}'.format(nmeaMessages[-1].latitude))
 				print('Longitude: {}'.format(nmeaMessages[-1].longitude))
 				print('Current time (GMT): {}'.format(nmeaMessages[-1].timestamp))
@@ -137,6 +143,7 @@ def get_gnss_message(rsa):
 				print('Incomplete parsing, trying again.')
 			except pynmea2.nmea.ParseError:
 				print('Unable to parse data, trying again.')
+	print('GNGGA not found in NMEA message.')
 
 
 def convert_to_unixtime(ts):
@@ -144,7 +151,7 @@ def convert_to_unixtime(ts):
 	#the current date, and converts the full naive timestamp to unix time
 	d = datetime.date.today()
 	dts = datetime.datetime.combine(d, ts)
-	unixTime = calendar.timegm(dts.timetuple())
+	unixTime = timegm(dts.timetuple())
 	return unixTime
 
 
@@ -161,7 +168,7 @@ def main():
 	"""#################CONFIGURE INSTRUMENT#################"""
 	rsa.CONFIG_Preset()
 	
-	hwInstalled = setup_gnss(rsa)
+	hwInstalled = setup_gnss()
 
 	rsa.DEVICE_Run()
 	
@@ -170,7 +177,7 @@ def main():
 		print('Waiting for internal 1PPS.')
 		while eventOccurred.value == False:
 			rsa.GNSS_Get1PPSTimestamp(byref(eventOccurred), byref(eventTimestamp))
-		nmeaMessage = get_gnss_message(rsa)
+		nmeaMessage = get_gnss_message()
 		unixTime = convert_to_unixtime(nmeaMessage.timestamp)
 		print('Unix timestamp from NMEA messages: {}'.format(unixTime))
 	else:
