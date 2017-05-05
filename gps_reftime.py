@@ -187,7 +187,7 @@ def main():
 			rsa.DEVICE_GetEventStatus(eventID, byref(eventOccurred), byref(eventTimestamp))
 		
 		"""################################################################
-		<insert code that gets a unix timestamp from some GPS system here>
+		  <insert code that gets a unix timestamp from some GPS system here>
 		   ################################################################"""
 		
 		unixTime = int(input('Enter any integer and press enter to continue. > '))

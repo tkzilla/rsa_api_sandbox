@@ -2,11 +2,11 @@
 Tektronix RSA_API Example
 Author: Morgan Allison
 Date created: 6/15
-Date edited: 1/17
+Date edited: 2/17
 Windows 7 64-bit
 RSA API version 3.9.0029
-Python 3.5.2 64-bit (Anaconda 4.2.0)
-NumPy 1.11.2, MatPlotLib 1.5.3
+Python 3.6.0 64-bit (Anaconda 4.3.0)
+NumPy 1.11.3, MatPlotLib 2.0.0, wave 0.0.2
 Download Anaconda: http://continuum.io/downloads
 Anaconda includes NumPy and MatPlotLib
 Download the RSA_API: http://www.tek.com/model/rsa306-software
@@ -18,17 +18,14 @@ YOU WILL NEED TO REFERENCE THE API DOCUMENTATION
 
 from ctypes import *
 from os import chdir
-from mpl_toolkits.mplot3d import Axes3D
-import time
+from time import sleep
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.io.wavfile
+import time, winsound, struct, wave
 
-"""
-#############################################################
-C:\Tektronix\RSA_API\lib\x64 needs to be added to the 
-PATH system environment variable
-#############################################################
-"""
+# C:\Tektronix\RSA_API\lib\x64 needs to be added to the 
+# PATH system environment variable
 chdir("C:\\Tektronix\\RSA_API\\lib\\x64")
 rsa = cdll.LoadLibrary("RSA_API.dll")
 
@@ -47,7 +44,7 @@ class Spectrum_Settings(Structure):
     ('actualFreqStepSize', c_double), 
     ('actualRBW', c_double),
     ('actualVBW', c_double), 
-    ('actualNumIQSamples', c_double)]
+    ('actualNumIQSamples', c_double)] b
 
 
 class Spectrum_TraceInfo(Structure):
@@ -130,7 +127,6 @@ def search_connect():
     err_check(ret)
 
     if numFound.value < 1:
-        rsa.DEVICE_Reset(c_int(0))
         print('No instruments found. Exiting script.')
         exit()
     elif numFound.value == 1:
@@ -210,8 +206,8 @@ def spectrum_example():
     freq = create_frequency_array(specSet)
     peakPower, peakFreq = peak_power_detector(freq, trace)
 
-    fig = plt.figure(1,figsize=(20,10))
-    ax = plt.subplot(111, axisbg='k')
+    fig = plt.figure(1,figsize=(15,10))
+    ax = plt.subplot(111, facecolor='k')
     ax.plot(freq, trace, color='y')
     ax.set_title('Spectrum Trace')
     ax.set_xlabel('Frequency (Hz)')
@@ -240,6 +236,10 @@ def config_block_iq(cf=1e9, refLevel=0, iqBw=40e6, recordLength=10e3):
     rsa.IQBLK_GetIQSampleRate(byref(iqSampleRate))
     # Create array of time data for plotting IQ vs time
     time = np.linspace(0,recordLength/iqSampleRate.value, recordLength)
+    time1 = []
+    step = recordLength/iqSampleRate.value/(recordLength-1)
+    for i in range(recordLength):
+        time1.append(i*step)
     return time
 
 
@@ -267,18 +267,18 @@ def block_iq_example():
     cf = 1e9
     refLevel = 0
     iqBw = 40e6
-    recordLength = 10e3
+    recordLength = 1e3
 
     time = config_block_iq(cf, refLevel, iqBw, recordLength)
     IQ = acquire_block_iq(recordLength)
 
-    fig = plt.figure(1, figsize=(20,10))
+    fig = plt.figure(1, figsize=(15,10))
     fig.suptitle('I and Q vs Time', fontsize='20')
-    ax1 = plt.subplot(211, axisbg='k')
+    ax1 = plt.subplot(211, facecolor='k')
     ax1.plot(time*1e3, np.real(IQ), color='y')
     ax1.set_ylabel('I (V)')
     ax1.set_xlim([time[0]*1e3, time[-1]*1e3])
-    ax2 = plt.subplot(212, axisbg='k')
+    ax2 = plt.subplot(212, facecolor='k')
     ax2.plot(time*1e3, np.imag(IQ), color='c')
     ax2.set_ylabel('I (V)')
     ax2.set_xlabel('Time (msec)')
@@ -353,24 +353,14 @@ def extract_dpx_spectrum(fb):
 
 
 def extract_dpxogram(fb):
-    sogramSet = DPX_SogramSettingStruct()
-    rsa.DPX_GetSogramSettings(byref(sogramSet))
-    timeResolution = sogramSet.sogramTraceLineTime
+    # When converting a ctypes pointer to a numpy array, we need to 
+    # explicitly specify its length to dereference it correctly
+    dpxogram = np.array(fb.sogramBitmap[:fb.sogramBitmapSize])
+    dpxogram = dpxogram.reshape((fb.sogramBitmapHeight, 
+        fb.sogramBitmapWidth))
+    dpxogram = dpxogram[:fb.sogramBitmapNumValidLines,:]
 
-    intArray = c_int16*fb.spectrumTraceLength
-    vData = intArray()
-    vDataSize = c_int32(0)
-    dataSF = c_double(0)
-    validTraces = fb.sogramBitmapNumValidLines
-    dpxogram = np.empty((validTraces,fb.spectrumTraceLength))
-
-    for i in range(validTraces):
-        rsa.DPX_GetSogramHiResLine(vData, byref(vDataSize), c_int32(i), 
-        byref(dataSF), c_int32(fb.spectrumTraceLength), c_int32(0))
-        dpxogram[i] = np.array(vData)
-    dpxogram = dpxogram*dataSF.value
-
-    return dpxogram, timeResolution
+    return dpxogram
 
 
 def dpx_example():
@@ -384,44 +374,48 @@ def dpx_example():
     fb = acquire_dpx_frame()
 
     dpxBitmap, specTrace1, specTrace2, specTrace3 = extract_dpx_spectrum(fb)
-    dpxogram, timeResolution = extract_dpxogram(fb)
+    dpxogram = extract_dpxogram(fb)
+    numTicks = 11
+    plotFreq = np.linspace(cf-span/2, cf+span/2, numTicks)/1e9
+    
+
 
     """################PLOT################"""
     # Plot out the three DPX spectrum traces
-    fig = plt.figure(1, figsize=(22,12))
+    fig = plt.figure(1, figsize=(15,10))
     ax1 = fig.add_subplot(131)
     ax1.set_title('DPX Spectrum Traces')
-    ax1.set_xlabel('Frequency (Hz)')
+    ax1.set_xlabel('Frequency (GHz)')
     ax1.set_ylabel('Amplitude (dBm)')
+    dpxFreq /= 1e9
     st1, = plt.plot(dpxFreq, specTrace1)
     st2, = plt.plot(dpxFreq, specTrace2)
     st3, = plt.plot(dpxFreq, specTrace3)
     ax1.legend([st1, st2, st3], ['Max Hold', 'Min Hold', 'Average'])
     ax1.set_xlim([dpxFreq[0], dpxFreq[-1]])
 
-    # This figure is a 3D representation of the DPX bitmap  
-    # The methodology was patched together from a few Matplotlib example files
-    # If anyone can figure out how to do a 3D colormap, that'd be cool.
-    ax2 = fig.add_subplot(132, projection='3d')
-    for i in range(fb.spectrumBitmapHeight):
-        index = fb.spectrumBitmapHeight-1-i
-        ax2.plot(dpxBitmap[i], dpxFreq, dpxAmp[index], color='b')
+    # Show the colorized DPX display
+    ax2 = fig.add_subplot(132)
+    ax2.imshow(dpxBitmap)
+    ax2.set_aspect(7)
     ax2.set_title('DPX Bitmap')
-    ax2.set_zlim(refLevel-100, refLevel)
-    ax2.set_xlabel('Spectral Density (counter hits)')
-    ax2.set_ylabel('Frequency (Hz)')
-    ax2.set_zlabel('Amplitude (dBm)')
+    ax2.set_xlabel('Frequency (GHz)')
+    ax2.set_ylabel('Amplitude (dBm)')
+    xTicks = map('{:.4}'.format, plotFreq)
+    plt.xticks(np.linspace(0, fb.spectrumBitmapWidth, numTicks), xTicks)
+    yTicks = map('{}'.format, np.linspace(refLevel, refLevel-100, numTicks))
+    plt.yticks(np.linspace(0, fb.spectrumBitmapHeight, numTicks), yTicks)
+    
+    # Show the colorized DPXogram
+    ax3 = fig.add_subplot(133)
+    ax3.imshow(dpxogram)
+    ax3.set_aspect(12)
+    ax3.set_title('DPXogram')
+    ax3.set_xlabel('Frequency (GHz)')
+    ax3.set_ylabel('Trace Lines')
+    xTicks = map('{:.4}'.format, plotFreq)
+    plt.xticks(np.linspace(0, fb.sogramBitmapWidth, numTicks), xTicks)
 
-    # This plot is a composite 3D representation of all DPXogram traces
-    ax3 = fig.add_subplot(133, projection='3d')
-    for i in range(fb.sogramBitmapNumValidLines):
-        ax3.plot(dpxFreq, dpxogram[i], i*timeResolution, color='b', zdir='y')
-    ax3.set_title('DPXogram Traces')
-    ax3.set_ylim(0, fb.sogramBitmapNumValidLines*timeResolution)
-    ax3.set_zlim(np.amin(dpxogram), np.amax(dpxogram))
-    ax3.set_xlabel('Frequency (Hz)')
-    ax3.set_ylabel('Time (sec)')
-    ax3.set_zlabel('Amplitude (dBm)')
     plt.tight_layout()
     plt.show()
     rsa.DEVICE_Disconnect()
@@ -451,7 +445,7 @@ def if_stream_example():
     rsa.DEVICE_Run()
     rsa.IFSTREAM_SetEnable(c_bool(True))
     while writing.value == True:
-        time.sleep(waitTime)
+        sleep(waitTime)
         rsa.IFSTREAM_GetActiveStatus(byref(writing))
     print('Streaming finished.')
     rsa.DEVICE_Stop()
@@ -461,7 +455,7 @@ def if_stream_example():
 """################IQ STREAMING EXAMPLE################"""
 def config_iq_stream(cf=1e9, refLevel=0, bw=10e6, 
     fileDir='C:\\SignalVu-PC Files', fileName='iq_stream_test', dest=2, 
-    suffixCtl=-2, durationMsec=100):
+    suffixCtl=-2, dType=2, durationMsec=100):
     filenameBase = fileDir + '\\' + fileName
     bwActual = c_double(0)
     sampleRate = c_double(0)
@@ -469,11 +463,12 @@ def config_iq_stream(cf=1e9, refLevel=0, bw=10e6,
     rsa.CONFIG_SetReferenceLevel(c_double(refLevel))
     
     rsa.IQSTREAM_SetAcqBandwidth(c_double(bw))
-    rsa.IQSTREAM_SetOutputConfiguration(c_int(dest), c_int(2))
+    rsa.IQSTREAM_SetOutputConfiguration(c_int(dest), c_int(dType))
     rsa.IQSTREAM_SetDiskFilenameBase(c_char_p(filenameBase.encode()))
     rsa.IQSTREAM_SetDiskFilenameSuffix(c_int(suffixCtl))
     rsa.IQSTREAM_SetDiskFileLength(c_int(durationMsec))
     rsa.IQSTREAM_GetAcqParameters(byref(bwActual), byref(sampleRate))
+    rsa.IQSTREAM_ClearAcqStatus()
 
 
 def iqstream_status_parser(iqStreamInfo):
@@ -499,13 +494,14 @@ def iq_stream_example():
     search_connect()
 
     cf = 2.4453e9
-    refLevel = 0
+    refLevel = -30
 
-    bw = 5e6
-    dest = 2
+    bw = 40e6
+    dest = 3
+    dType = 2
     suffixCtl = -2
-    durationMsec = 100
-    waitTime = durationMsec/1e3/10
+    durationMsec = 30000
+    waitTime = 0.1
     fileDir = 'C:\\SignalVu-PC Files'
     fileName = 'iq_stream_test'
     iqStreamInfo = IQSTREAM_File_Info()
@@ -513,12 +509,12 @@ def iq_stream_example():
     complete = c_bool(False)
     writing = c_bool(False)
 
-    config_iq_stream()
+    config_iq_stream(bw=bw, dest=dest, durationMsec=durationMsec)
 
     rsa.DEVICE_Run()    
     rsa.IQSTREAM_Start()
     while complete.value == False:
-        time.sleep(waitTime)
+        sleep(waitTime)
         rsa.IQSTREAM_GetDiskFileWriteStatus(byref(complete), byref(writing))
     rsa.IQSTREAM_Stop()
     print('Streaming finished.')
@@ -526,6 +522,71 @@ def iq_stream_example():
     iqstream_status_parser(iqStreamInfo)
     rsa.DEVICE_Stop()
     rsa.DEVICE_Disconnect()
+
+
+"""################AUDIO EXAMPLE################"""
+def config_audio(mode=3, volume=1.0, mute=False):
+    rsa.AUDIO_SetMode(c_int(mode))
+    rsa.AUDIO_SetVolume(c_float(1.0))
+    rsa.AUDIO_SetMute(c_bool(mute))
+    
+
+def audio_example():
+    search_connect()
+    cf = 99.10e6
+    refLevel = -30
+    span = 40e6
+    rbw = 300e3
+
+    audioMode = 3
+    volume = 0.5
+    mute = False
+    audioEnabled = c_bool(False)
+    audioSamples = 10000
+    inSize = c_uint16(audioSamples)
+    outSize = c_uint16(0)
+    audioArray = c_int16*audioSamples
+    audioData = audioArray()
+    fileName = 'C:\\SignalVu-PC Files\\wavfile.wav'
+
+    config_spectrum(cf, refLevel, span, rbw)
+    config_audio(audioMode, volume, mute)
+
+    rsa.DEVICE_Run()
+    rsa.AUDIO_Start()
+    rsa.AUDIO_GetEnable(byref(audioEnabled))
+    ret = rsa.AUDIO_GetData(byref(audioData), inSize, byref(outSize))
+    values = []
+    for i in audioData:
+        values.append(struct.pack('h', i))
+
+    audio = ''.join(values)
+
+    # audio = np.asarray(audioData, dtype=np.int16)
+    print(audio)
+
+    print('playing memory')
+    winsound.PlaySound(audio, winsound.SND_MEMORY)
+
+    rsa.AUDIO_Stop()
+    rsa.DEVICE_Stop()
+
+    print('Ret: ', ret)
+    print('Audio Enabled: ', audioEnabled.value)
+    print('Audio in: ', inSize.value)
+    print('Audio out: ', outSize.value)
+
+    with open(fileName, 'w') as f:
+        scipy.io.wavfile.write(f, 32000, audio)
+    
+
+    # with open(fileName, 'rb') as f:
+    #     data = f.read()
+    # print(data[:50])
+    print('playing file')
+    winsound.PlaySound(fileName, winsound.SND_FILENAME)
+
+    # time.sleep(5)
 
 
 """################MISC################"""
@@ -545,11 +606,12 @@ def peak_power_detector(freq, trace):
 
 def main():
     # uncomment the example you'd like to run
-    spectrum_example()
+    # spectrum_example()
     # block_iq_example()
     # dpx_example()
     # if_stream_example()
     # iq_stream_example()
+    audio_example()
 
 
 if __name__ == '__main__':
