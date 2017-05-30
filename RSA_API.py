@@ -16,12 +16,12 @@ YOU WILL NEED TO REFERENCE THE API DOCUMENTATION
 """
 
 from ctypes import *
-from enum import Enum
+from enum import IntEnum
 
 class RSAError(Exception):
     pass
 
-class ReturnStatus(Enum):
+class ReturnStatus(IntEnum):
     noError = 0
 
     # Connection
