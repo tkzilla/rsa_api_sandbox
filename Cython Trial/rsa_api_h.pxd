@@ -1,10 +1,27 @@
+# from libc.stddef cimport wchar_t
+# from libc.stdlib cimport *
+# from libc.string cimport *
+# from cpython.ref cimport PyObject
+
+# cdef extern from "Python.h":
+    # PyObject* PyUnicode_FromWideChar(wchar_t* w, Py_ssize_t size)
+    # wchar_t* PyUnicode_AsWideCharString(object, Py_ssize_t *)
+
 cdef extern from 'RSA_API.h':
     
     ##########################################################
     # Status and Error Reporting
     ##########################################################
     
+    ctypedef   signed char  int8_t
+    ctypedef   signed short int16_t
+    ctypedef   signed int   int32_t
+    ctypedef   signed long  int64_t
+    ctypedef unsigned char  uint8_t
+    ctypedef unsigned short uint16_t
+    ctypedef unsigned int   uint32_t
     ctypedef unsigned long long uint64_t
+    # ctypedef unsigned short wchar_t
     
     ctypedef enum ReturnStatus:
         noError = 0
@@ -178,6 +195,7 @@ cdef extern from 'RSA_API.h':
 
     # AcqDataStatus enum defined in rsa_api.pyx
 
+
     ##########################################################
     # Device Connection and Info
     ##########################################################
@@ -221,7 +239,7 @@ cdef extern from 'RSA_API.h':
     # DEVINFO_MAX_STRLEN defined in rsa_api.pyx
     
     ReturnStatus DEVICE_GetNomenclature(char* nomenclature)
-    # ReturnStatus DEVICE_GetNomenclatureW(wchar_t * nomenclature)
+    ReturnStatus DEVICE_GetNomenclatureW(Py_UNICODE* nomenclature)
     ReturnStatus DEVICE_GetSerialNumber(char* serialNum)
     ReturnStatus DEVICE_GetAPIVersion(char* apiVersion)
     ReturnStatus DEVICE_GetFWVersion(char* fwVersion)
@@ -239,6 +257,7 @@ cdef extern from 'RSA_API.h':
     ReturnStatus DEVICE_GetInfo(DEVICE_INFO* devInfo)
 
     ReturnStatus DEVICE_GetOverTemperatureStatus(bint* overTemperature)
+
 
     ##########################################################
     # Device Configuration (global)
@@ -263,6 +282,7 @@ cdef extern from 'RSA_API.h':
     ReturnStatus CONFIG_SetRFPreampEnable(bint enable)
     ReturnStatus CONFIG_GetRFAttenuator(double* value)
     ReturnStatus CONFIG_SetRFAttenuator(double value)
+    
     
     ##########################################################
     # Trigger Configuration
@@ -293,6 +313,7 @@ cdef extern from 'RSA_API.h':
     ReturnStatus TRIG_GetTriggerPositionPercent(double* trigPosPercent)
     ReturnStatus TRIG_ForceTrigger()
     
+    
     ##########################################################
     # Device Alignment
     ##########################################################
@@ -300,6 +321,7 @@ cdef extern from 'RSA_API.h':
     ReturnStatus ALIGN_GetWarmupStatus(bint* warmedUp)
     ReturnStatus ALIGN_GetAlignmentNeeded(bint* needed)
     ReturnStatus ALIGN_RunAlignment()
+    
     
     ##########################################################
     # Device Operation (global)
@@ -315,6 +337,7 @@ cdef extern from 'RSA_API.h':
     
     ReturnStatus DEVICE_GetEventStatus(int eventID, bint* eventOccurred, uint64_t* eventTimestamp)
     
+    
     ##########################################################
     # System/Reference Time
     ##########################################################
@@ -328,8 +351,9 @@ cdef extern from 'RSA_API.h':
     ReturnStatus REFTIME_SetReferenceTime(Py_ssize_t refTimeSec, uint64_t refTimeNsec, uint64_t refTimestamp)
     ReturnStatus REFTIME_GetReferenceTime(Py_ssize_t* refTimeSec, uint64_t* refTimeNsec, uint64_t* refTimestamp)
     
+    
     ##########################################################
-    # IQ Block Data aquisition
+    # IQ Block Data Acquisition
     ##########################################################
     
     ReturnStatus IQBLK_GetMaxIQBandwidth(double* maxBandwidth)
@@ -357,17 +381,8 @@ cdef extern from 'RSA_API.h':
         uint64_t triggerTimestamp
         int acqStatus
     
-    ReturnStatus IQBLK_GetIQAcqInfo(IQBLK_ACQINFO * acqInfo)
+    ReturnStatus IQBLK_GetIQAcqInfo(IQBLK_ACQINFO* acqInfo)
     
-    ctypedef struct IQHeader:
-        int acqDataStatus
-        uint64_t acquisitionTimestamp
-        int frameID
-        int trigger1Index
-        int trigger2Index
-        int timeSyncIndex
-    
-    ReturnStatus GetIQHeader(IQHeader* header)
     
     ##########################################################
     # Spectrum Trace Acquisition
@@ -452,295 +467,278 @@ cdef extern from 'RSA_API.h':
     # DPX Bitmap, Trace, and Spectrogram
     ##########################################################
 
+    ctypedef struct DPX_FrameBuffer:
+        int32_t fftPerFrame
+        int64_t fftCount
+        int64_t frameCount
+        double timestamp
+        uint32_t acqDataStatus
 
-# DEVICE_SearchInt usage
-    # cdef int numDevicesFound = 0
-    # cdef int* deviceIDs
-    # cdef char** deviceSerial
-    # cdef char** deviceType
+        double minSigDuration
+        bint minSigDurOutOfRange
 
-    # rs = DEVICE_SearchInt(&numDevicesFound, &deviceIDs, &deviceSerial, &deviceType)
-    # print('Number of devices: {}'.format(numDevicesFound))
-    # print('Device serial numbers: {}'.format(deviceSerial[0]))
-    # print('Device type: {}'.format(deviceType[0]))
+        int32_t spectrumBitmapWidth
+        int32_t spectrumBitmapHeight
+        int32_t spectrumBitmapSize
+        int32_t spectrumTraceLength
+        int32_t numSpectrumTraces
+
+        bint spectrumEnabled
+        bint spectrogramEnabled
+
+        float spectrumBitmap[161001]
+        float spectrumTraces[3][64001]
+
+        int32_t sogramBitmapWidth
+        int32_t sogramBitmapHeight
+        int32_t sogramBitmapSize
+        int32_t sogramBitmapNumValidLines
+        uint8_t sogramBitmap[133500]
+        double sogramBitmapTimestampArray[500]
+        int16_t sogramBitmapContainTriggerArray[500]
 
 
-    #
-    # class DEVICE_INFO(Structure):
-    #     _fields_ = c_int([('nomenclature', c_char_p),
-    #                 ('serialNum', c_char_p),
-    #                 ('apiVersion', c_char_p),
-    #                 ('fwVersion', c_char_p),
-    #                 ('fpgaVersion', c_char_p),
-    #                 ('hwVersion', c_char_p)]
-    #
-    # class TriggerMode:
-    #     def __init__(self):
-    #         self.freeRun = c_int(c_int(0)
-    #         self.triggered = c_int(c_int(1)
-    #
-    # TriggerMode = c_int(TriggerMode()
-    #
-    # class TriggerSource:
-    #     def __init__(self):
-    #         self.TriggerSourceExternal = c_int(c_int(0)
-    #         self.TriggerSourceIFPowerLevel = c_int(c_int(1)
-    #
-    # TriggerSource = c_int(TriggerSource()
-    #
-    # class TriggerTransition:
-    #     def __init__(self):
-    #         self.TriggerTransitionLH = c_int(c_int(1)
-    #         self.TriggerTransitionHL = c_int(c_int(2)
-    #         self.TriggerTransitionEither = c_int(c_int(3)
-    #
-    # TriggerTransition = c_int(TriggerTransition()
-    #
-    # DEVEVENT_OVERRANGE = c_int(c_int(0)
-    # DEVEVENT_TRIGGER = c_int(c_int(1)
-    # DEVEVENT_1PPS = c_int(c_int(2)
-    #
-    # class RunMode:
-    #     def __init__(self):
-    #         self.stopped = c_int(c_int(0)
-    #         self.running = c_int(c_int(1)
-    #
-    # RunMode = c_int(RunMode()
-    #
-    # IQBLK_STATUS_INPUT_OVERRANGE = c_int((1 << 0)
-    # IQBLK_STATUS_FREQREF_UNLOCKED = c_int((1 << 1)
-    # IQBLK_STATUS_ACQ_SYS_ERROR = c_int((1 << 2)
-    # IQBLK_STATUS_DATA_XFER_ERROR = c_int((1 << 3)
-    #
-    # class IQBLK_ACQINFO(Structure):
-    #     _fields_ = c_int([('sample0Timestamp', c_uint64),
-    #                 ('triggerSampleIndex', c_uint64),
-    #                 ('triggerTimestamp', c_uint64),
-    #                 ('acqStatus', c_uint32)]
-    #
-    # class IQHeader(Structure):
-    #     _fields_ = c_int([('acqDataStatus', c_uint16),
-    #                 ('acquisitionTimestamp', c_uint64),
-    #                 ('frameID', c_uint32),
-    #                 ('trigger1Index', c_uint16),
-    #                 ('trigger2Index', c_uint16),
-    #                 ('timeSyncIndex', c_uint16)]
-    #
-    # class SpectrumWindows:
-    #     def __init__(self):
-    #         self.SpectrumWindow_Kaiser = c_int(c_int(0)
-    #         self.SpectrumWindow_Mil6dB = c_int(c_int(1)
-    #         self.SpectrumWindow_BlackmanHarris = c_int(c_int(2)
-    #         self.SpectrumWindow_Rectangle = c_int(c_int(3)
-    #         self.SpectrumWindow_FlatTop = c_int(c_int(4)
-    #         self.SpectrumWindow_Hann = c_int(c_int(5)
-    #
-    # SpectrumWindows = c_int(SpectrumWindows()
-    #
-    # class SpectrumTraces:
-    #     def __init__(self):
-    #         self.SpectrumTrace1 = c_int(c_int(0)
-    #         self.SpectrumTrace2 = c_int(c_int(1)
-    #         self.SpectrumTrace3 = c_int(c_int(2)
-    #
-    # SpectrumTraces = c_int(SpectrumTraces()
-    #
-    # class SpectrumDetectors:
-    #     def __init__(self):
-    #         self.SpectrumDetector_PosPeak = c_int(c_int(0)
-    #         self.SpectrumDetector_NegPeak = c_int(c_int(1)
-    #         self.SpectrumDetector_AverageVRMS = c_int(c_int(2)
-    #         self.SpectrumDetector_Sample = c_int(c_int(3)
-    #
-    # SpectrumDetectors = c_int(SpectrumDetectors()
-    #
-    # class SpectrumVerticalUnits:
-    #     def __init__(self):
-    #         self.SpectrumVerticalUnit_dBm = c_int(c_int(0)
-    #         self.SpectrumVerticalUnit_Watt = c_int(c_int(1)
-    #         self.SpectrumVerticalUnit_Volt = c_int(c_int(2)
-    #         self.SpectrumVerticalUnit_Amp = c_int(c_int(3)
-    #         self.SpectrumVerticalUnit_dBmV = c_int(c_int(4)
-    #
-    # SpectrumVerticalUnits = c_int(SpectrumVerticalUnits()
-    #
-    # class Spectrum_Settings(Structure):
-    #     _fields_ = c_int([('span', c_double),
-    #                 ('rbw', c_double),
-    #                 ('enableVBW', c_bint),
-    #                 ('vbw', c_double),
-    #                 ('traceLength', c_int),
-    #                 ('window', c_int),
-    #                 ('verticalUnit', c_int),
-    #                 ('actualStartFreq', c_double),
-    #                 ('actualStopFreq', c_double),
-    #                 ('actualFreqStepSize', c_double),
-    #                 ('actualRBW', c_double),
-    #                 ('actualVBW', c_double),
-    #                 ('actualNumIQSamples', c_double)]
-    #
-    # class Spectrum_Limits(Structure):
-    #     _fields_ = c_int([('maxSpan', c_double),
-    #                 ('minSpan', c_double),
-    #                 ('maxRBW', c_double),
-    #                 ('minRBW', c_double),
-    #                 ('maxVBW', c_double),
-    #                 ('minVBW', c_double),
-    #                 ('maxTraceLength', c_int),
-    #                 ('minTraceLength', c_int)]
-    #
-    # class Spectrum_TraceInfo(Structure):
-    #     _fields_ = c_int([('timestamp', c_int64),
-    #                 ('acqDataStatus', c_uint16)]
-    #
-    # class DPX_FrameBuffer(Structure):
-    #     _fields_ = c_int([('fftPerFrame', c_int32),
-    #                 ('fftCount', c_int64),
-    #                 ('frameCount', c_int64),
-    #                 ('timestamp', c_double),
-    #                 ('acqDataStatus', c_uint32),
-    #                 ('minSigDuration', c_double),
-    #                 ('minSigDurOutOfRange', c_bint),
-    #                 ('spectrumBitmapWidth', c_int32),
-    #                 ('spectrumBitmapHeight', c_int32),
-    #                 ('spectrumBitmapSize', c_int32),
-    #                 ('spectrumTraceLength', c_int32),
-    #                 ('numSpectrumTraces', c_int32),
-    #                 ('spectrumEnabled', c_bint),
-    #                 ('spectrogramEnabled', c_bint),
-    #                 ('spectrumBitmap', POINTER(c_float)),
-    #                 ('spectrumTraces', POINTER(POINTER(c_float))),
-    #                 ('sogramBitmapWidth', c_int32),
-    #                 ('sogramBitmapHeight', c_int32),
-    #                 ('sogramBitmapSize', c_int32),
-    #                 ('sogramBitmapNumValidLines', c_int32),
-    #                 ('sogramBitmap', POINTER(c_uint8)),
-    #                 ('sogramBitmapTimestampArray', POINTER(c_double)),
-    #                 ('sogramBitmapContainTriggerArray', POINTER(c_double))]
-    #
-    # class DPX_SogramSettingStruct(Structure):
-    #     _fields_ = c_int([('bitmapWidth', c_int32),
-    #                 ('bitmapHeight', c_int32),
-    #                 ('sogramTraceLineTime', c_double),
-    #                 ('sogramBitmapLineTime', c_double)]
-    #
-    # class DPX_SettingStruct(Structure):
-    #     _fields_ = c_int([('enableSpectrum', c_bint),
-    #                 ('enableSpectrogram', c_bint),
-    #                 ('bitmapWidth', c_int32),
-    #                 ('bitmapHeight', c_int32),
-    #                 ('traceLength', c_int32),
-    #                 ('decayFactor', c_float),
-    #                 ('actualRBW', c_double)]
-    #
-    # class TraceType:
-    #     def __init__(self):
-    #         self.TraceTypeAverage = c_int(c_int(0)
-    #         self.TraceTypeMax = c_int(c_int(1)
-    #         self.TraceTypeMaxHold = c_int(c_int(2)
-    #         self.TraceTypeMin = c_int(c_int(3)
-    #         self.TraceTypeMinHold = c_int(c_int(4)
-    #
-    # TraceType = c_int(TraceType()
-    #
-    # class VerticalUnitType:
-    #     def __init__(self):
-    #         self.VerticalUnit_dBm = c_int(c_int(0)
-    #         self.VerticalUnit_Watt = c_int(c_int(1)
-    #         self.VerticalUnit_Volt = c_int(c_int(2)
-    #         self.VerticalUnit_Amp = c_int(c_int(3)
-    #
-    # VerticalUnitType = c_int(VerticalUnitType()
-    #
-    # DPX_TRACEIDX_1 = c_int(c_int(0)
-    # DPX_TRACEIDX_2 = c_int(c_int(1)
-    # DPX_TRACEIDX_3 = c_int(c_int(2)
-    #
-    # class AudioDemodMode:
-    #     def __init__(self):
-    #         self.ADM_FM_8KHZ = c_int(c_int(0)
-    #         self.ADM_FM_13KHZ = c_int(c_int(1)
-    #         self.ADM_FM_75KHZ = c_int(c_int(2)
-    #         self.ADM_FM_200KHZ = c_int(c_int(3)
-    #         self.ADM_AM_8KHZ = c_int(c_int(4)
-    #         self.ADM_NONE = c_int(c_int(5)  # internal use only
-    #
-    # AudioDemodMode = c_int(AudioDemodMode()
-    #
-    # class StreamingMode:
-    #     def __init__(self):
-    #         self.StreamingModeRaw = c_int(c_int(0)
-    #         self.StreamingModeFormatted = c_int(c_int(1)
-    #
-    # StreamingMode = c_int(StreamingMode()
-    #
-    # class IQSOUTDEST:
-    #     def __init__(self):
-    #         self.IQSOD_CLIENT = c_int(c_int(0)
-    #         self.IQSOD_FILE_TIQ = c_int(c_int(1)
-    #         self.IQSOD_FILE_SIQ = c_int(c_int(2)
-    #         self.IQSOD_FILE_SIQ_SPLIT = c_int(c_int(3)
-    #
-    # IQSOUTDEST = c_int(IQSOUTDEST()
-    #
-    # class IQSOUTDTYPE:
-    #     def __init__(self):
-    #         self.IQSODT_SINGLE = c_int(c_int(0)
-    #         self.IQSODT_INT32 = c_int(c_int(1)
-    #         self.IQSODT_INT16 = c_int(c_int(2)
-    #
-    # IQSOUTDTYPE = c_int(IQSOUTDTYPE()
-    #
-    # IQSSDFN_SUFFIX_INCRINDEX_MIN = c_int(c_int(0)
-    # IQSSDFN_SUFFIX_TIMESTAMP = c_int(c_int(-1)
-    # IQSSDFN_SUFFIX_NONE = c_int(c_int(-2)
-    #
-    # IFSSDFN_SUFFIX_INCRINDEX_MIN = c_int(c_int(0)
-    # IFSSDFN_SUFFIX_TIMESTAMP = c_int(c_int(-1)
-    # IFSSDFN_SUFFIX_NONE = c_int(c_int(-2)
-    #
-    # IQSTRM_STATUS_OVERRANGE = c_int((1 << 0)
-    # IQSTRM_STATUS_XFER_DISCONTINUITY = c_int((1 << 1)
-    # IQSTRM_STATUS_IBUFF75PCT = c_int((1 << 2)
-    # IQSTRM_STATUS_IBUFFOVFLOW = c_int((1 << 3)
-    # IQSTRM_STATUS_OBUFF75PCT = c_int((1 << 4)
-    # IQSTRM_STATUS_OBUFFOVFLOW = c_int((1 << 5)
-    # IQSTRM_STATUS_NONSTICKY_SHIFT = c_int(0
-    # IQSTRM_STATUS_STICKY_SHIFT = c_int(16
-    #
-    # IQSTRM_MAXTRIGGERS = c_int(100
-    #
-    # class IQSTRMIQINFO(Structure):
-    #     _fields_ = c_int([('timestamp', c_uint64),
-    #                 ('triggerCount', c_int),
-    #                 ('triggerIndices', POINTER(c_int)),
-    #                 ('scaleFactor', c_double),
-    #                 ('acqStatus', c_uint32)]
-    #
-    # class IQSTREAM_File_Info(Structure):
-    #     _fields_ = c_int([('numberSamples', c_uint64),
-    #                 ('sample0Timestamp', c_uint64),
-    #                 ('triggerSampleIndex', c_uint64),
-    #                 ('triggerTimestamp', c_uint64),
-    #                 ('acqStatus', c_uint32),
-    #                 ('filenames', c_wchar_p)]
-    #
-    # class GNSS_SATSYS:
-    #     def __init__(self):
-    #         self.GNSS_NOSYS = c_int(c_int(0)
-    #         self.GNSS_GPS_GLONASS = c_int(c_int(1)
-    #         self.GNSS_GPS_BEIDOU = c_int(c_int(2)
-    #         self.GNSS_GPS = c_int(c_int(3)
-    #         self.GNSS_GLONASS = c_int(c_int(4)
-    #         self.GNSS_BEIDOU = c_int(c_int(5)
-    #
-    # GNSS_SATSYS = c_int(GNSS_SATSYS()
-    #
-    # class POWER_INFO(Structure):
-    #     _fields_ = c_int([('externalPowerPresent', c_bint),
-    #                 ('batteryPresent', c_bint),
-    #                 ('batteryChargeLevel', c_double),
-    #                 ('batteryCharging', c_bint),
-    #                 ('batteryOverTemperature', c_bint),
-    #                 ('batteryHardwareError', c_bint)]
-    #
+    ctypedef struct DPX_SogramSettingsStruct:
+        int32_t bitmapWidth
+        int32_t bitmapHeight
+        double sogramTraceLineTime
+        double sogramBitmapLineTime
+
+    ctypedef struct DPX_SettingsStruct:
+        bint enableSpectrum
+        bint enableSpectrogram
+        int32_t bitmapWidth
+        int32_t bitmapHeight
+        int32_t traceLength
+        float decayFactor
+        double actualRBW
+
+    ctypedef enum TraceType:
+        TraceTypeAverage = 0
+        TraceTypeMax = 1
+        TraceTypeMaxHold = 2
+        TraceTypeMin = 3
+        TraceTypeMinHold = 4
+
+    ctypedef enum VerticalUnitType:
+        VerticalUnit_dBm = 0
+        VerticalUnit_Watt = 1
+        VerticalUnit_Volt = 2
+        VerticalUnit_Amp = 3
+
+    ReturnStatus DPX_GetEnable(bint* enable)
+    ReturnStatus DPX_SetEnable(bint enable)
+    ReturnStatus DPX_SetParameters(double fspan, double rbw, int32_t bitmapWidth, int32_t tracePtsPerPixel,
+                                               VerticalUnitType yUnit, double yTop, double yBottom,
+                                               bint infinitePersistence, double persistenceTimeSec, bint showOnlyTrigFrame)
+    ReturnStatus DPX_Configure(bint enableSpectrum, bint enableSpectrogram)
+    ReturnStatus DPX_GetSettings(DPX_SettingsStruct* pSettings)
+
+    ReturnStatus DPX_SetSpectrumTraceType(int32_t traceIndex, TraceType type)
+
+    ReturnStatus DPX_GetRBWRange(double fspan, double* minRBW, double* maxRBW)
+    # YOU ARE HERE
+    ReturnStatus DPX_Reset()
+    ReturnStatus DPX_WaitForDataReady(int timeoutMsec, bint* ready)
+
+    ReturnStatus DPX_GetFrameInfo(int64_t* frameCount, int64_t* fftCount)
+
+    ReturnStatus DPX_SetSogramParameters(double timePerBitmapLine, double timeResolution, double maxPower, double minPower)
+    ReturnStatus DPX_SetSogramTraceType(TraceType traceType)
+    ReturnStatus DPX_GetSogramSettings(DPX_SogramSettingsStruct *pSettings)
+
+    ReturnStatus DPX_GetSogramHiResLineCountLatest(int32_t* lineCount)
+    ReturnStatus DPX_GetSogramHiResLineTriggered(bint* triggered, int32_t lineIndex)
+    ReturnStatus DPX_GetSogramHiResLineTimestamp(double* timestamp, int32_t lineIndex)
+    ReturnStatus DPX_GetSogramHiResLine(int16_t* vData, int32_t* vDataSize, int32_t lineIndex, double* dataSF, int32_t tracePoints, int32_t firstValidPoint)
+
+    ReturnStatus DPX_GetFrameBuffer(DPX_FrameBuffer* frameBuffer)
+
+    # The client is required to call FinishFrameBuffer() before the next frame can be available.
+    ReturnStatus DPX_FinishFrameBuffer()
+    ReturnStatus DPX_IsFrameBufferAvailable(bint* frameAvailable)
+    
+    
+    ##########################################################
+    # Audio Demod
+    ##########################################################
+
+    ctypedef enum AudioDemodMode:
+        ADM_FM_8KHZ = 0
+        ADM_FM_13KHZ = 1
+        ADM_FM_75KHZ = 2
+        ADM_FM_200KHZ = 3
+        ADM_AM_8KHZ = 4
+        # ADM_NONE	// internal use only
+
+    ReturnStatus AUDIO_SetMode(AudioDemodMode mode)
+    ReturnStatus AUDIO_GetMode(AudioDemodMode* mode)
+
+    ReturnStatus AUDIO_SetVolume(float volume)
+    ReturnStatus AUDIO_GetVolume(float* _volume)
+
+    ReturnStatus AUDIO_SetMute(bint mute)
+    ReturnStatus AUDIO_GetMute(bint* _mute)
+
+    ReturnStatus AUDIO_SetFrequencyOffset(double freqOffsetHz)
+    ReturnStatus AUDIO_GetFrequencyOffset(double* freqOffsetHz)
+
+    ReturnStatus AUDIO_Start()
+    ReturnStatus AUDIO_Stop()
+    ReturnStatus AUDIO_GetEnable(bint *enable)
+
+    # Get data from audio ooutput
+    # User must allocate data to inSize before calling
+    # Actual data returned is in outSize and will not exceed inSize
+    ReturnStatus AUDIO_GetData(int16_t* data, uint16_t inSize, uint16_t* outSize)
+
+
+    ###########################################################
+    # IF(ADC) Data Streaming to disk
+    ###########################################################
+    
+    ctypedef enum StreamingMode:
+        StreamingModeRaw = 0
+        StreamingModeFramed = 1
+
+    ReturnStatus IFSTREAM_SetEnable(bint enable)
+    ReturnStatus IFSTREAM_GetActiveStatus(bint* active)
+    ReturnStatus IFSTREAM_SetDiskFileMode(StreamingMode mode)
+    ReturnStatus IFSTREAM_SetDiskFilePath(const char* path)
+    ReturnStatus IFSTREAM_SetDiskFilenameBase(const char* base)
+    
+    # IFSSDFN enum type defined in rsa_api.pyx
+    
+    ReturnStatus IFSTREAM_SetDiskFilenameSuffix(int suffixCtl)
+    ReturnStatus IFSTREAM_SetDiskFileLength(int msec)
+    ReturnStatus IFSTREAM_SetDiskFileCount(int count)
+
+
+    ###########################################################
+    # IQ Data Streaming to Client or Disk
+    ###########################################################
+
+    ReturnStatus IQSTREAM_GetMaxAcqBandwidth(double* maxBandwidthHz)
+    ReturnStatus IQSTREAM_GetMinAcqBandwidth(double* minBandwidthHz)
+    ReturnStatus IQSTREAM_SetAcqBandwidth(double bwHz_req)
+    ReturnStatus IQSTREAM_GetAcqParameters(double* bwHz_act, double* srSps)
+
+    ctypedef enum IQSOUTDEST:
+        IQSOD_CLIENT = 0
+        IQSOD_FILE_TIQ = 1
+        IQSOD_FILE_SIQ = 2
+        IQSOD_FILE_SIQ_SPLIT = 3
+        
+    ctypedef enum IQSOUTDTYPE:
+        IQSODT_SINGLE = 0
+        IQSODT_INT32 = 1
+        IQSODT_INT16 = 2
+        
+    ReturnStatus IQSTREAM_SetOutputConfiguration(IQSOUTDEST dest, IQSOUTDTYPE dtype)
+    ReturnStatus IQSTREAM_SetIQDataBufferSize(int reqSize)
+    ReturnStatus IQSTREAM_GetIQDataBufferSize(int* maxSize)
+
+    # ReturnStatus IQSTREAM_SetDiskFilenameBaseW(const wchar_t* filenameBaseW)
+    ReturnStatus IQSTREAM_SetDiskFilenameBase(const char* filenameBase)
+    
+    # IQSSDFN enum type defined in rsa_api.pyx
+    
+    ReturnStatus IQSTREAM_SetDiskFilenameSuffix(int suffixCtl)
+    ReturnStatus IQSTREAM_SetDiskFileLength(int msec)
+
+    ReturnStatus IQSTREAM_Start()
+    ReturnStatus IQSTREAM_Stop()
+    ReturnStatus IQSTREAM_GetEnable(bint* enable)
+
+    # IQSTRM_STATUS enum type defined in rsa_api.pyx
+    # IQSTRM_MAXTRIGGERS enum type defined in rsa_api.pyx
+
+    ctypedef struct IQSTRMIQINFO:
+        uint64_t timestamp
+        int triggerCount
+        int* triggerIndices
+        double scaleFactor
+        uint32_t acqStatus
+
+    ReturnStatus IQSTREAM_GetIQData(void* iqdata, int* iqlen, IQSTRMIQINFO* iqinfo)
+
+    ReturnStatus IQSTREAM_GetDiskFileWriteStatus(bint* isComplete, bint* isWriting)
+
+    # IQSTRM_FILENAME enum type defined in rsa_api.pyx
+
+    ctypedef struct IQSTRMFILEINFO:
+        uint64_t numberSamples
+        uint64_t sample0Timestamp
+        uint64_t triggerSampleIndex
+        uint64_t triggerTimestamp
+        uint32_t acqStatus
+        Py_UNICODE** filenames
+
+    ReturnStatus IQSTREAM_GetDiskFileInfo(IQSTRMFILEINFO* fileinfo)
+
+    void IQSTREAM_ClearAcqStatus()
+
+
+    ###########################################################
+    # Stored IF Data File Playback
+    ###########################################################
+    
+    # THIS IS NOT WORKING IN ANY PROGRAMMING LANGUAGE
+    ReturnStatus PLAYBACK_OpenDiskFile(
+        Py_UNICODE* fileName,
+        int startPercentage,
+        int stopPercentage,
+        double skipTimeBetweenFullAcquisitions,
+        bint loopAtEndOfFile,
+        bint emulateRealTime)
+
+    ReturnStatus PLAYBACK_GetReplayComplete(bint* complete)
+
+    
+    ###########################################################
+    # Tracking Generator Control
+    ###########################################################
+
+    ReturnStatus TRKGEN_GetHwInstalled(bint* installed)
+    ReturnStatus TRKGEN_SetEnable(bint enable)
+    ReturnStatus TRKGEN_GetEnable(bint* enable)
+    ReturnStatus TRKGEN_SetOutputLevel(double leveldBm)
+    ReturnStatus TRKGEN_GetOutputLevel(double* leveldBm)
+
+
+    ###########################################################
+    # GNSS Rx Control and Output
+    ###########################################################
+
+    ctypedef enum GNSS_SATSYS:
+        GNSS_NOSYS = 0
+        GNSS_GPS_GLONASS = 1
+        GNSS_GPS_BEIDOU = 2
+        GNSS_GPS = 3
+        GNSS_GLONASS = 4
+        GNSS_BEIDOU = 5
+
+    ReturnStatus GNSS_GetHwInstalled(bint* installed)
+    ReturnStatus GNSS_SetEnable(bint enable)
+    ReturnStatus GNSS_GetEnable(bint* enable)
+    ReturnStatus GNSS_SetSatSystem(GNSS_SATSYS satSystem)
+    ReturnStatus GNSS_GetSatSystem(GNSS_SATSYS* satSystem)
+    ReturnStatus GNSS_SetAntennaPower(bint powered)
+    ReturnStatus GNSS_GetAntennaPower(bint* powered)
+    ReturnStatus GNSS_GetNavMessageData(int* msgLen, const char** message)
+    ReturnStatus GNSS_ClearNavMessageData()
+    ReturnStatus GNSS_Get1PPSTimestamp(bint* isValid, uint64_t* timestamp1PPS)
+
+    ###########################################################
+    # Power and Battery Status
+    ###########################################################
+
+    ctypedef struct POWER_INFO:
+        bint externalPowerPresent
+        bint batteryPresent
+        double batteryChargeLevel
+        bint batteryCharging
+        bint batteryOverTemperature
+        bint batteryHardwareError
+
+    ReturnStatus POWER_GetStatus(POWER_INFO* powerInfo)

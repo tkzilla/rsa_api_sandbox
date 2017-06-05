@@ -1,1 +1,3 @@
-import rsa_api
+from rsa_api import *
+
+main()

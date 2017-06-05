@@ -301,7 +301,7 @@ def dpx_example():
     print('\n\n########DPX Example########')
     search_connect()
     cf = 2.4453e9
-    refLevel = -30
+    refLevel = 0
     span = 40e6
     rbw = 100e3
 
@@ -521,6 +521,24 @@ def audio_example():
     # time.sleep(5)
 
 
+def if_playback():
+    search_connect()
+    rsa.CONFIG_Preset()
+    fileName = u'C:\\SignalVu-PC Files\\if_stream_test.r3f'
+    startPercentage = 0
+    stopPercentage = 100
+    skip = 0.001
+    loop = False
+    realTime = True
+    complete = c_bool(False)
+    
+    rsa.PLAYBACK_OpenDiskFile(c_wchar_p(fileName), c_int(startPercentage), c_int(stopPercentage), c_double(skip), c_bool(loop), c_bool(realTime))
+    print('Opened file, beginning playback.')
+    rsa.DEVICE_Run()
+    while not complete.value:
+        rsa.PLAYBACK_GetReplayComplete(byref(complete))
+    print('Playback Complete: {}'.format((complete.value)))
+
 
 """################MISC################"""
 def config_trigger(trigMode=TriggerMode.triggered, trigLevel=-10,
@@ -541,11 +559,12 @@ def peak_power_detector(freq, trace):
 def main():
     # uncomment the example you'd like to run
     spectrum_example()
-    block_iq_example()
-    dpx_example()
-    if_stream_example()
-    iq_stream_example()
+    # block_iq_example()
+    # dpx_example()
+    # if_stream_example()
+    # iq_stream_example()
     # audio_example()
+    if_playback()
 
 
 if __name__ == '__main__':
