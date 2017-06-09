@@ -1,12 +1,115 @@
 from rsa_api_h cimport *
 import numpy as np
-import matplotlib.pyplot as plt
+cimport numpy as np
+
+class RSAError(Exception):
+    pass
 
 def err_check(rs):
     errMessage = DEVICE_GetErrorString(rs).decode()
     if errMessage != 'No Error':
-        print(errMessage)
-        # raise Exception(errMessage)
+        # print(errMessage)
+        raise RSAError(errMessage)
+
+
+##########################################################
+# Structs and Named Enums
+##########################################################
+
+
+cpdef enum TriggerMode:
+    freeRun = 0
+    triggered = 1
+
+cpdef enum TriggerSource:
+    TriggerSourceExternal = 0
+    TriggerSourceIFPowerLevel = 1
+
+cpdef enum TriggerTransition:
+    TriggerTransitionLH = 1
+    TriggerTransitionHL = 2
+    TriggerTransitionEither = 3
+
+cpdef enum SpectrumWindows:
+    SpectrumWindow_Kaiser = 0
+    SpectrumWindow_Mil6dB = 1
+    SpectrumWindow_BlackmanHarris = 2
+    SpectrumWindow_Rectangle = 3
+    SpectrumWindow_FlatTop = 4
+    SpectrumWindow_Hann = 5
+
+cpdef enum SpectrumTraces:
+    SpectrumTrace1 = 0
+    SpectrumTrace2 = 1
+    SpectrumTrace3 = 2
+
+cpdef enum SpectrumDetectors:
+    SpectrumDetector_PosPeak = 0
+    SpectrumDetector_NegPeak = 1
+    SpectrumDetector_AverageVRMS = 2
+    SpectrumDetector_Sample = 3
+
+cpdef enum SpectrumVerticalUnits:
+    SpectrumVerticalUnit_dBm = 0
+    SpectrumVerticalUnit_Watt = 1
+    SpectrumVerticalUnit_Volt = 2
+    SpectrumVerticalUnit_Amp = 3
+    SpectrumVerticalUnit_dBmV = 4
+
+cpdef enum TraceType:
+    TraceTypeAverage = 0
+    TraceTypeMax = 1
+    TraceTypeMaxHold = 2
+    TraceTypeMin = 3
+    TraceTypeMinHold = 4
+
+cpdef enum VerticalUnitType:
+    VerticalUnit_dBm = 0
+    VerticalUnit_Watt = 1
+    VerticalUnit_Volt = 2
+    VerticalUnit_Amp = 3
+
+
+# NB: Due to the inability of Cython to convert C pointers to Python objects,
+# it was necessary to preallocate the spectrumBitmap, spectrumTraces, and
+# sogramBitmap struct members. Due also to some inability of Cython to pass
+# a struct containing preallocated multidimensional arrays correctly to
+# external functions, it is necessary to "reformat" certain complex struct
+# members and feed them to a Python class for the DPX_FrameBuffer IN THE
+# FUNCTION THAT CALLS DPX_GetFrameBuffer() ITSELF. Passing the
+# DPX_FrameBuffer object to another function DOES NOT result in correct passing
+class DPX_FrameBuffer_py():
+    def __init__(self, fb, spectrumBitmap, spectrumTraces, sogramBitmap):
+        self.fftPerFrame = fb['fftPerFrame']
+        self.fftCount = fb['fftCount']
+        self.frameCount = fb['frameCount']
+        self.timestamp = fb['timestamp']
+        self.acqDataStatus = fb['acqDataStatus']
+
+        self.minSigDuration = fb['minSigDuration']
+        self.minSigDurOutOfRange = fb['minSigDurOutOfRange']
+
+        self.spectrumBitmapWidth = fb['spectrumBitmapWidth']
+        self.spectrumBitmapHeight = fb['spectrumBitmapHeight']
+        self.spectrumBitmapSize = fb['spectrumBitmapSize']
+        self.spectrumTraceLength = fb['spectrumTraceLength']
+        self.numSpectrumTraces = fb['numSpectrumTraces']
+
+        self.spectrumEnabled = fb['spectrumEnabled']
+        self.spectrogramEnabled = fb['spectrogramEnabled']
+
+        self.spectrumBitmap = spectrumBitmap
+        self.spectrumTraces = spectrumTraces
+
+        self.sogramBitmapWidth = fb['sogramBitmapWidth']
+        self.sogramBitmapHeight = fb['sogramBitmapHeight']
+        self.sogramBitmapSize = fb['sogramBitmapSize']
+        self.sogramBitmapNumValidLines = fb['sogramBitmapNumValidLines']
+        
+        self.sogramBitmap = sogramBitmap
+        self.sogramBitmapTimestampArray = fb['sogramBitmapTimestampArray']
+        self.sogramBitmapContainTriggerArray = fb['sogramBitmapContainTriggerArray']
+
 
 ##########################################################
 # Nameless Enums
@@ -59,584 +162,651 @@ IQSTRM_FILENAME_DATA_IDX = 0
 IQSTRM_FILENAME_HEADER_IDX = 1
 
 
-def device_connection_info():
-    ##########################################################
-    # Device Connection and Info
-    ##########################################################
-    print('\n########Device Connection########')
+##########################################################
+# Device Connection and Info
+##########################################################
+
+
+def DEVICE_Search_py():
     cdef int numDevicesFound = 0
     cdef int deviceIDs[20]
     cdef char deviceSerial[20][100]
     cdef char deviceType[20][20]
-    
-    rs = DEVICE_Search(&numDevicesFound, deviceIDs, deviceSerial, deviceType)
-    err_check(rs)
-    
+    err_check(DEVICE_Search(&numDevicesFound, deviceIDs,
+              deviceSerial, deviceType))
     devs = np.asarray(deviceIDs)
+    return numDevicesFound, devs, deviceSerial, deviceType
+
+
+def DEVICE_Connect_py(deviceID=0):
+    cdef int _deviceID = deviceID
+    err_check(DEVICE_Connect(_deviceID))
+
     
-    print('Number of devices: {}'.format(numDevicesFound))
-    print('Device serial numbers: {}'.format(deviceSerial[0].decode()))
-    print('Device type: {}'.format(deviceType[0].decode()))
-    
-    DEVICE_Connect(devs[0])
-    # print(DEVICE_GetErrorString(DEVICE_Reset(devs[0])))
-    
+def DEVICE_GetOverTemperatureStatus_py():
     cdef bint tempStatus
-    rs = DEVICE_GetOverTemperatureStatus(&tempStatus)
-    err_check(rs)
-    print('Temperature Status: {}'.format(tempStatus))
-    
+    err_check(DEVICE_GetOverTemperatureStatus(&tempStatus))
+    return tempStatus.decode()
+
+
+def DEVICE_GetNomenclature_py():
     cdef char nomenclature[100]
-    rs = DEVICE_GetNomenclature(nomenclature)
-    err_check(rs)
-    print('Nomenclature: {}'.format(nomenclature.decode()))
-    
+    err_check(DEVICE_GetNomenclature(nomenclature))
+    return nomenclature.decode()
+
+
+def DEVICE_GetSerialNumber_py():
     cdef char serialNum[100]
-    rs = DEVICE_GetSerialNumber(serialNum)
-    err_check(rs)
-    print('Serial Number: {}'.format(serialNum.decode()))
-    
+    err_check(DEVICE_GetSerialNumber(serialNum))
+    return serialNum.decode()
+
+
+def DEVICE_GetAPIVersion_py():
     cdef char apiVersion[100]
-    rs = DEVICE_GetAPIVersion(apiVersion)
-    err_check(rs)
-    print('API Version: {}'.format(apiVersion.decode()))
+    err_check(DEVICE_GetAPIVersion(apiVersion))
+    return apiVersion.decode()
     
+    
+def DEVICE_GetFWVersion_py():
     cdef char fwVersion[100]
-    rs = DEVICE_GetFWVersion(fwVersion)
-    err_check(rs)
-    print('Firmware Version: {}'.format(fwVersion.decode()))
-    
+    err_check(DEVICE_GetFWVersion(fwVersion))
+    return fwVersion.decode()
+
+
+def DEVICE_GetFPGAVersion_py():
     cdef char fpgaVersion[100]
-    rs = DEVICE_GetFPGAVersion(fpgaVersion)
-    err_check(rs)
-    print('FPGA Version: {}'.format(fpgaVersion.decode()))
-    
+    err_check(DEVICE_GetFPGAVersion(fpgaVersion))
+    return fpgaVersion.decode()
+
+
+def DEVICE_GetHWVersion_py():
     cdef char hwVersion[100]
-    rs = DEVICE_GetHWVersion(hwVersion)
-    err_check(rs)
-    print('Hardware Version: {}'.format(hwVersion.decode()))
+    err_check(DEVICE_GetHWVersion(hwVersion))
+    return hwVersion.decode()
     
-    print('\nUsing DEVICE_GetInfo: ')
+    
+def DEVICE_GetInfo_py():
     cdef DEVICE_INFO devInfo
-    rs = DEVICE_GetInfo(&devInfo)
-    err_check(rs)
-    print('Nomenclature: {}'.format(devInfo.nomenclature.decode()))
-    print('Serial Number: {}'.format(devInfo.serialNum.decode()))
-    print('API Version: {}'.format(devInfo.apiVersion.decode()))
-    print('Firmware Version: {}'.format(devInfo.fwVersion.decode()))
-    print('FPGA Version: {}'.format(devInfo.fpgaVersion.decode()))
-    print('Hardware Version: {}'.format(devInfo.hwVersion.decode()))
+    err_check(DEVICE_GetInfo(&devInfo))
+    return devInfo
 
 
-def device_configuration():
-    ##########################################################
-    # Device Configuration (global)
-    ##########################################################
-    print('\n########Device Configuration########')
-    CONFIG_Preset()
-    cdef double refLevel = 0
-    rs = CONFIG_SetReferenceLevel(refLevel)
-    err_check(rs)
-    rs = CONFIG_GetReferenceLevel(&refLevel)
-    print('Reference Level: {}'.format(refLevel))
-    
+##########################################################
+# Device Configuration (global)
+##########################################################
+
+
+def CONFIG_Preset_py():
+    err_check(CONFIG_Preset())
+
+
+def CONFIG_SetReferenceLevel_py(refLevel=0):
+    cdef double _refLevel = refLevel
+    err_check(CONFIG_SetReferenceLevel(_refLevel))
+
+
+def CONFIG_GetReferenceLevel_py():
+    cdef double refLevel
+    err_check(CONFIG_GetReferenceLevel(&refLevel))
+    return refLevel
+
+def CONFIG_GetMaxCenterFreq_py():
     cdef double maxCF
+    err_check(CONFIG_GetMaxCenterFreq(&maxCF))
+    return maxCF
+
+
+def CONFIG_GetMinCenterFreq_py():
     cdef double minCF
-    rs = CONFIG_GetMaxCenterFreq(&maxCF)
-    err_check(rs)
-    rs = CONFIG_GetMinCenterFreq(&minCF)
-    err_check(rs)
-    print('Max CF: {}\nMin CF: {}'.format(maxCF, minCF))
+    err_check(CONFIG_GetMinCenterFreq(&minCF))
+    return minCF
     
-    cdef double cf = 2.4453e9
-    rs = CONFIG_SetCenterFreq(cf)
-    err_check(rs)
-    rs = CONFIG_GetCenterFreq(&cf)
-    err_check(rs)
-    print('Center Frequency: {}'.format(cf))
+
+def CONFIG_SetCenterFreq_py(cf=2.4453e9):
+    cdef double _cf = cf
+    err_check(CONFIG_SetCenterFreq(_cf))
+
     
-    cdef bint exRefEn = 0
-    rs = CONFIG_SetExternalRefEnable(exRefEn)
-    err_check(rs)
-    rs = CONFIG_GetExternalRefEnable(&exRefEn)
-    err_check(rs)
-    print('External Reference Status: {}'.format(exRefEn))
-    
+def CONFIG_GetCenterFreq_py():
+    cdef double center
+    err_check(CONFIG_GetCenterFreq(&center))
+    return center
+
+
+def CONFIG_SetExternalRefEnable_py(enable=True):
+    err_check(CONFIG_SetExternalRefEnable(enable))
+
+
+def CONFIG_GetExternalRefEnable_py():
+    cdef bint enable
+    err_check(CONFIG_GetExternalRefEnable(&enable))
+    return enable
+
+
+def CONFIG_GetExternalRefFrequency_py():
     cdef double extFreq
-    rs = CONFIG_GetExternalRefFrequency(&extFreq)
-    err_check(rs)
-    print('External Frequency: {}'.format(extFreq))
-    
-    cdef bint autoAttenEnable = 0
-    rs = CONFIG_SetAutoAttenuationEnable(autoAttenEnable)
-    err_check(rs)
-    rs = CONFIG_GetAutoAttenuationEnable(&autoAttenEnable)
-    err_check(rs)
-    print('Auto Attenuation Status: {}'.format(autoAttenEnable))
-    
-    cdef bint preampEnable = 1
-    rs = CONFIG_SetRFPreampEnable(preampEnable)
-    err_check(rs)
-    rs = CONFIG_GetRFPreampEnable(&preampEnable)
-    err_check(rs)
-    print('Preamp Status: {}'.format(preampEnable))
-    
-    cdef double value = 0
-    rs = CONFIG_SetRFAttenuator(value)
-    err_check(rs)
-    rs = CONFIG_GetRFAttenuator(&value)
-    err_check(rs)
-    print('Attenuator Value: {}'.format(value))
+    err_check(CONFIG_GetExternalRefFrequency(&extFreq))
+    return extFreq
 
 
-def trigger_configuration():
-    ##########################################################
-    #  Trigger Configuration
-    ##########################################################
-    print('\n########Trigger########')
-    cdef TriggerMode mode = TriggerMode.freeRun
-    rs = TRIG_SetTriggerMode(mode)
-    err_check(rs)
-    rs = TRIG_GetTriggerMode(&mode)
-    err_check(rs)
-    print('Trigger Mode: {}'.format(mode))
+def CONFIG_SetAutoAttenuationEnable_py(enable=True):
+    err_check(CONFIG_SetAutoAttenuationEnable(enable))
     
-    cdef TriggerSource source = TriggerSource.TriggerSourceIFPowerLevel
-    rs = TRIG_SetTriggerSource(source)
-    err_check(rs)
-    rs = TRIG_GetTriggerSource(&source)
-    err_check(rs)
-    print('Trigger Source: {}'.format(source))
     
-    cdef TriggerTransition transition = TriggerTransition.TriggerTransitionHL
-    rs = TRIG_SetTriggerTransition(transition)
-    err_check(rs)
-    rs = TRIG_GetTriggerTransition(&transition)
-    err_check(rs)
-    print('Trigger Transition: {}'.format(transition))
-    
-    cdef double level = -30
-    rs = TRIG_SetIFPowerTriggerLevel(level)
-    err_check(rs)
-    rs = TRIG_GetIFPowerTriggerLevel(&level)
-    err_check(rs)
-    print('Trigger Level: {}'.format(level))
-    
-    cdef double trigPosPercent = 15
-    rs = TRIG_SetTriggerPositionPercent(trigPosPercent)
-    err_check(rs)
-    rs = TRIG_GetTriggerPositionPercent(&trigPosPercent)
-    err_check(rs)
-    print('Trigger Position(%): {}'.format(trigPosPercent))
-    
-    rs = TRIG_ForceTrigger()
-    err_check(rs)
+def CONFIG_GetAutoAttenuationEnable_py():
+    cdef bint enable
+    err_check(CONFIG_GetAutoAttenuationEnable(&enable))
+    return enable
 
 
-def device_alignment():
-    ##########################################################
-    # Device Alignment
-    ##########################################################
-    print('\n########Device Alignment########')
-    cdef bint warmedUp = False
+def CONFIG_SetRFPreampEnable_py(enable=True):
+    err_check(CONFIG_SetRFPreampEnable(enable))
+    
+
+def CONFIG_GetRFPreampEnable_py():
+    cdef bint enable
+    err_check(CONFIG_GetRFPreampEnable(&enable))
+    return enable
+
+
+def CONFIG_SetRFAttenuator_py(atten=10):
+    cdef double _atten = atten
+    err_check(CONFIG_SetRFAttenuator(_atten))
+
+
+def CONFIG_GetRFAttenuator_py():
+    cdef double a
+    err_check(CONFIG_GetRFAttenuator(&a))
+    return a
+
+
+##########################################################
+#  Trigger Configuration
+##########################################################
+
+
+def TRIG_SetTriggerMode_py(mode=TriggerMode.triggered):
+    err_check(TRIG_SetTriggerMode(mode))
+    
+    
+def TRIG_GetTriggerMode_py():
+    # cdef TriggerMode mode
+    cdef int mode
+    err_check(TRIG_GetTriggerMode(&mode))
+    return mode
+    
+
+def TRIG_SetTriggerSource_py(source=TriggerSource.TriggerSourceIFPowerLevel):
+    err_check(TRIG_SetTriggerSource(source))
+    
+
+def TRIG_GetTriggerSource_py():
+    # cdef TriggerSource source
+    cdef int source
+    err_check(TRIG_GetTriggerSource(&source))
+    return source
+    
+    
+def TRIG_SetTriggerTransition_py(transition=TriggerTransition.TriggerTransitionLH):
+    err_check(TRIG_SetTriggerTransition(transition))
+    
+    
+def TRIG_GetTriggerTransition_py():
+    # cdef TriggerTransition transition
+    cdef int transition
+    err_check(TRIG_GetTriggerTransition(&transition))
+    return transition
+    
+    
+def TRIG_SetIFPowerTriggerLevel_py(trigLevel=-10):
+    cdef double _trigLevel = trigLevel
+    err_check(TRIG_SetIFPowerTriggerLevel(_trigLevel))
+    
+
+def TRIG_GetIFPowerTriggerLevel_py():
+    cdef double trigLevel
+    err_check(TRIG_GetIFPowerTriggerLevel(&trigLevel))
+    return trigLevel
+
+
+def TRIG_SetTriggerPositionPercent_py(trigPosPercent=10):
+    cdef double _trigPosPercent = trigPosPercent
+    err_check(TRIG_SetTriggerPositionPercent(_trigPosPercent))
+    
+
+def TRIG_GetTriggerPositionPercent_py():
+    cdef double trigPosPercent
+    err_check(TRIG_GetTriggerPositionPercent(&trigPosPercent))
+    return trigPosPercent
+    
+    
+def TRIG_ForceTrigger_py():
+    err_check(TRIG_ForceTrigger())
+
+
+##########################################################
+# Device Alignment
+##########################################################
+
+def ALIGN_GetWarmupStatus_py():
+    cdef bint warmedUp
+    err_check(ALIGN_GetWarmupStatus(&warmedUp))
+    return warmedUp
+
+
+def ALIGN_GetAlignmentNeeded_py():
     cdef bint needed = False
-    rs = ALIGN_GetWarmupStatus(&warmedUp)
-    err_check(rs)
-    print('Warmup Status: {}'.format(warmedUp))
-    rs = ALIGN_GetAlignmentNeeded(&needed)
-    err_check(rs)
-    print('Alignment Needed: {}'.format(needed))
-    # rs = ALIGN_RunAlignment()
-    err_check(rs)
+    err_check(ALIGN_GetAlignmentNeeded(&needed))
+    return needed
 
 
-def device_operation():
-    ##########################################################
-    # Device Operation (global)
-    ##########################################################
-    print('\n########Device Operation########')
-    rs = DEVICE_PrepareForRun()
-    err_check(rs)
-    rs = DEVICE_Run()
-    err_check(rs)
-    cdef bint devEnable = True
-    rs = DEVICE_GetEnable(&devEnable)
-    err_check(rs)
-    print('Device Enable: {}'.format(devEnable))
-    rs = DEVICE_StartFrameTransfer()
-    err_check(rs)
-    rs = DEVICE_Stop()
-    err_check(rs)
+def ALIGN_RunAlignment_py():
+    err_check(ALIGN_RunAlignment())
+
+
+##########################################################
+# Device Operation (global)
+##########################################################
+
+
+def DEVICE_PrepareForRun_py():
+    err_check(DEVICE_PrepareForRun())
+
+
+def DEVICE_Run_py():
+    err_check(DEVICE_Run())
+
+
+def DEVICE_GetEnable_py():
+    cdef bint devEnable
+    err_check(DEVICE_GetEnable(&devEnable))
+    return devEnable
     
-    # DEVEVENT_OVERRANGE = 0
-    # DEVEVENT_TRIGGER = 1
-    # DEVEVENT_1PPS = 2
-    cdef int eventID = DEVEVENT_TRIGGER
-    cdef bint eventOccurred = True
-    cdef uint64_t eventTimestamp = 0
-    rs = DEVICE_GetEventStatus(eventID, &eventOccurred, &eventTimestamp)
-    err_check(rs)
-    print('EventID: {}\nEvent Occurred: {}\nEvent Timestamp: {}'.format(
-        eventID, eventOccurred, eventTimestamp))
+    
+def DEVICE_StartFrameTransfer_py():
+    err_check(DEVICE_StartFrameTransfer())
+    
+    
+def DEVICE_Stop_py():
+    err_check(DEVICE_Stop())
+    
+
+def DEVICE_GetEventStatus_py(eventID=DEVEVENT_OVERRANGE):
+    cdef int _eventID = eventID
+    cdef bint eventOccurred
+    cdef uint64_t eventTimestamp
+    err_check(DEVICE_GetEventStatus(_eventID, &eventOccurred, &eventTimestamp))
+    return eventOccurred, eventTimestamp
 
 
-def reference_time():
     ##########################################################
     # System/Reference Time
     ##########################################################
-    print('\n########System/Reference Time########')
-    cdef uint64_t o_refTimestampRate = 0
-    rs = REFTIME_GetTimestampRate(&o_refTimestampRate)
-    err_check(rs)
-    print('Timestamp Rate: {}'.format(o_refTimestampRate))
+def REFTIME_GetTimestampRate_py():
+    cdef uint64_t o_refTimestampRate
+    err_check(REFTIME_GetTimestampRate(&o_refTimestampRate))
+    return o_refTimestampRate
     
+    
+def REFTIME_GetCurrentTime_py():
     cdef Py_ssize_t o_timeSec = 0
     cdef uint64_t o_timeNsec = 0
     cdef uint64_t o_timestamp = 0
-    cdef Py_ssize_t i_timeSec = 0
-    cdef uint64_t i_timeNsec = 0
-    cdef uint64_t i_timestamp = 0
-    rs = REFTIME_GetCurrentTime(&o_timeSec, &o_timeNsec, &o_timestamp)
-    err_check(rs)
-    print('Current Time - sec: {} nsec: {} timestamp: {}'.format(
-        o_timeSec, o_timeNsec, o_timestamp))
+    err_check(REFTIME_GetCurrentTime(&o_timeSec, &o_timeNsec, &o_timestamp))
+    return o_timeSec, o_timeNsec, o_timestamp
     
-    rs = REFTIME_GetTimeFromTimestamp(i_timestamp, &o_timeSec, &o_timeNsec)
-    err_check(rs)
-    print('Time from Timestamp - sec: {} nsec: {}'.format(
-        o_timeSec, o_timeNsec))
     
-    rs = REFTIME_GetTimestampFromTime(i_timeSec, i_timeNsec, &o_timestamp)
-    err_check(rs)
-    print('Timestamp from Time: {}'.format(o_timestamp))
+def REFTIME_GetTimeFromTimestamp_py(i_timestamp):
+    cdef uint64_t _i_timestamp = i_timestamp
+    cdef Py_ssize_t o_timeSec
+    cdef uint64_t o_timeNsec
+    err_check(REFTIME_GetTimeFromTimestamp(_i_timestamp, &o_timeSec, &o_timeNsec))
+    return o_timeSec, o_timeNsec
     
-    cdef double sec = 0
-    rs = REFTIME_GetIntervalSinceRefTimeSet(&sec)
-    err_check(rs)
-    print('Interval Since Reftime Set: {}'.format(sec))
     
-    cdef Py_ssize_t refTimeSec = 1496247164
-    cdef uint64_t refTimeNsec = 0
-    cdef uint64_t refTimestamp = refTimeSec + refTimeNsec
-    rs = REFTIME_SetReferenceTime(refTimeSec, refTimeNsec, refTimestamp)
-    err_check(rs)
+def REFTIME_GetTimestampFromTime_py(i_timeSec, i_timeNsec):
+    cdef Py_ssize_t _i_timeSec = i_timeSec
+    cdef uint64_t _i_timeNsec = i_timeNsec
+    cdef uint64_t o_timestamp
+    err_check(REFTIME_GetTimestampFromTime(_i_timeSec, _i_timeNsec, &o_timestamp))
+    return o_timestamp
     
-    rs = REFTIME_GetReferenceTime(&refTimeSec, &refTimeNsec, &refTimestamp)
-    err_check(rs)
-    print('Reference Time - sec: {} nsec: {} timestamp: {}'.format(
-        refTimeSec, refTimeNsec, refTimestamp))
+
+def REFTIME_GetIntervalSinceRefTimeSet_py():
+    cdef double sec
+    err_check(REFTIME_GetIntervalSinceRefTimeSet(&sec))
+    return sec
 
 
-def iq_block_data():
-    ##########################################################
-    # IQ Block Data Acquisition
-    ##########################################################
-    print('\n########IQ Block########')
-    cdef double maxBandwidth = 0
-    cdef double minBandwidth = 0
-    cdef int maxSamples = 0
-    rs = IQBLK_GetMaxIQBandwidth(&maxBandwidth)
-    err_check(rs)
-    rs = IQBLK_GetMinIQBandwidth(&minBandwidth)
-    err_check(rs)
-    rs = IQBLK_GetMaxIQRecordLength(&maxSamples)
-    err_check(rs)
-    print('Max IQ BW: {}\nMin IQ BW: {}\nMax Samples {}'.format(
-        maxBandwidth, minBandwidth, maxSamples))
+def REFTIME_SetReferenceTime_py(refTimeSec, refTimeNsec):
+    cdef Py_ssize_t _refTimeSec = refTimeSec
+    cdef uint64_t _refTimeNsec = refTimeNsec
+    cdef uint64_t refTimestamp = _refTimeSec + _refTimeNsec
+    err_check(REFTIME_SetReferenceTime(_refTimeSec, _refTimeNsec, refTimestamp))
     
-    cdef double iqBandwidth = 20e6
-    cdef double iqSampleRate = 0
-    cdef int recordLength = 1000
-    rs = IQBLK_SetIQBandwidth(iqBandwidth)
-    err_check(rs)
-    rs = IQBLK_GetIQBandwidth(&iqBandwidth)
-    err_check(rs)
-    rs = IQBLK_GetIQSampleRate(&iqSampleRate)
-    err_check(rs)
-    rs = IQBLK_SetIQRecordLength(recordLength)
-    err_check(rs)
-    rs = IQBLK_GetIQRecordLength(&recordLength)
-    err_check(rs)
-    print('IQ BW: {}\nIQ Sample Rate: {}\nRecord Length: {}'.format(
-        iqBandwidth, iqSampleRate, recordLength))
     
-    cdef bint ready = False
-    cdef float iqDataIlv[2000]  # recordLength*2 preallocation
-    cdef float iData[1000]
-    cdef float qData[1000]
-    cdef Cplx32 iqDataCplx[1000]
-    cdef int outLength = 0
-    cdef int reqLength = recordLength
-    cdef int timeoutMsec = 100
-    
-    rs = DEVICE_Run()
-    rs = IQBLK_AcquireIQData()
-    while ready == 0:
-        rs = IQBLK_WaitForIQDataReady(timeoutMsec, &ready)
-        print('IQ Ready: {}'.format(ready))
-    rs = IQBLK_GetIQData(iqDataIlv, &outLength, reqLength)
-    err_check(rs)
-    
-    ready = False
-    rs = DEVICE_Run()
-    rs = IQBLK_AcquireIQData()
-    while ready == 0:
-        rs = IQBLK_WaitForIQDataReady(timeoutMsec, &ready)
-        print('IQ Ready: {}'.format(ready))
-    rs = IQBLK_GetIQDataDeinterleaved(iData, qData, &outLength, reqLength)
-    err_check(rs)
-    
-    ready = False
-    rs = DEVICE_Run()
-    rs = IQBLK_AcquireIQData()
-    while ready == 0:
-        rs = IQBLK_WaitForIQDataReady(timeoutMsec, &ready)
-        print('IQ Ready: {}'.format(ready))
-    rs = IQBLK_GetIQDataCplx(iqDataCplx, &outLength, reqLength)
-    err_check(rs)
-    iqCplx = [(d['i'] + 1j * d['q']) for d in np.asarray(iqDataCplx)]
+def REFTIME_GetReferenceTime_py():
+    cdef Py_ssize_t refTimeSec
+    cdef uint64_t refTimeNsec
+    cdef uint64_t refTimestamp
+    err_check(REFTIME_GetReferenceTime(&refTimeSec, &refTimeNsec, &refTimestamp))
+    return refTimeSec, refTimeNsec, refTimestamp
 
+
+##########################################################
+# IQ Block Data Acquisition
+##########################################################
+
+
+def IQBLK_GetMaxIQBandwidth_py():
+    cdef double maxBandwidth
+    err_check(IQBLK_GetMaxIQBandwidth(&maxBandwidth))
+    return maxBandwidth
+
+
+def IQBLK_GetMinIQBandwidth_py():
+    cdef double minBandwidth
+    err_check(IQBLK_GetMinIQBandwidth(&minBandwidth))
+    return minBandwidth
+
+
+def IQBLK_GetMaxIQRecordLength_py():
+    cdef int maxSamples
+    err_check(IQBLK_GetMaxIQRecordLength(&maxSamples))
+    return maxSamples
+
+
+def IQBLK_SetIQBandwidth_py(iqBandwidth=40e6):
+    cdef double _iqBandwidth = iqBandwidth
+    err_check(IQBLK_SetIQBandwidth(_iqBandwidth))
+    
+
+def IQBLK_GetIQBandwidth_py():
+    cdef double iqBandwidth
+    err_check(IQBLK_GetIQBandwidth(&iqBandwidth))
+    return iqBandwidth
+
+
+def IQBLK_GetIQSampleRate_py():
+    cdef double iqSampleRate
+    err_check(IQBLK_GetIQSampleRate(&iqSampleRate))
+    return iqSampleRate
+
+
+def IQBLK_SetIQRecordLength_py(recordLength=1000):
+    cdef int _recordLength = recordLength
+    err_check(IQBLK_SetIQRecordLength(_recordLength))
+
+
+def IQBLK_GetIQRecordLength_py():
+    cdef int recordLength
+    err_check(IQBLK_GetIQRecordLength(&recordLength))
+    return recordLength
+    
+    
+def IQBLK_AcquireIQData_py():
+    err_check(IQBLK_AcquireIQData())
+    
+    
+def IQBLK_WaitForIQDataReady_py(timeoutMsec=100):
+    cdef int _timeoutMsec = timeoutMsec
+    cdef bint ready
+    err_check(IQBLK_WaitForIQDataReady(_timeoutMsec, &ready))
+    return ready
+
+
+def IQBLK_GetIQData_py(reqLength=1000):
+    cdef int _reqLength = reqLength
+    cdef int outLength
+    cdef np.ndarray iqData = np.empty(shape=(reqLength*2), dtype=np.float32, order='c')
+    err_check(IQBLK_GetIQData(<float*> iqData.data, &outLength, _reqLength))
+    return np.asarray(iqData, dtype=np.float32)
+
+    
+def IQBLK_GetIQDataDeinterleaved_py(reqLength=1000):
+    cdef int _reqLength = reqLength
+    cdef int outLength
+    cdef np.ndarray iData = np.empty(shape=(reqLength), dtype=np.float32, order='c')
+    cdef np.ndarray qData = np.empty(shape=(reqLength), dtype=np.float32, order='c')
+    err_check(IQBLK_GetIQDataDeinterleaved(<float*> iData.data, <float*> qData.data, &outLength, _reqLength))
+    return np.asarray(iData, dtype=np.float32), np.asarray(qData, dtype=np.float32)
+
+# Not worth the trouble to convert the Cplx32 struct to a Pythonic data type
+# The commented function below does not work
+# def IQBLK_GetIQDataCplx_py(reqLength):
+#     cdef int req = reqLength
+#     cdef int outLength
+#     cdef Cplx32 iqDataCplx[reqLength]
+#     err_check(IQBLK_GetIQDataCplx(iqDataCplx, &outLength, reqLength))
+#     return [(d['i'] + 1j * d['q']) for d in np.asarray(iqDataCplx)]
+
+# Helper function
+def IQBLK_Acquire_py(get_function=IQBLK_GetIQDataDeinterleaved_py,
+                     recordLength=1000, timeoutMsec=100):
+    DEVICE_Run_py()
+    IQBLK_AcquireIQData_py()
+    while not IQBLK_WaitForIQDataReady_py(timeoutMsec):
+        pass
+    return get_function(recordLength)
+
+
+def IQBLK_GetIQAcqInfo_py():
     cdef IQBLK_ACQINFO acqInfo
-    rs = IQBLK_GetIQAcqInfo(&acqInfo)
-    print('IQ Block Acquisition Info:\n{}'.format(acqInfo))
-    err_check(rs)
-    
-    fig = plt.figure(1, figsize=(10,10))
-    ax1 = fig.add_subplot(2,2,1)
-    ax1.set_title('IQ Interleaved')
-    ax1.plot(iqDataIlv)
-    ax2 = fig.add_subplot(2,2,2)
-    ax2.set_title('I Data')
-    ax2.plot(iData)
-    ax3 = fig.add_subplot(2,2,3)
-    ax3.set_title('Q Data')
-    ax3.plot(qData)
-    ax4 = fig.add_subplot(2,2,4)
-    ax4.set_title('IQ Complex')
-    ax4.plot(np.real(iqCplx))
-    plt.show()
+    err_check(IQBLK_GetIQAcqInfo(&acqInfo))
+    return acqInfo
 
 
-def spectrum_acquisition():
-    ##########################################################
-    # Spectrum Acquisition
-    ##########################################################
-    print('\n########Spectrum########')
-    cdef bint enable = True
-    rs = SPECTRUM_SetEnable(enable)
-    err_check(rs)
-    rs = SPECTRUM_GetEnable(&enable)
-    err_check(rs)
-    print('Spectrum Enable: {}'.format(enable))
+##########################################################
+# Spectrum Acquisition
+##########################################################
     
-    rs = SPECTRUM_SetDefault()
-    err_check(rs)
-    
+
+def SPECTRUM_SetEnable_py(enable):
+    cdef bint _enable = enable
+    err_check(SPECTRUM_SetEnable(_enable))
+
+
+def SPECTRUM_GetEnable_py():
+    cdef bint enable
+    err_check(SPECTRUM_GetEnable(&enable))
+    return enable
+
+
+def SPECTRUM_SetDefault_py():
+    err_check(SPECTRUM_SetDefault())
+
+
+def SPECTRUM_GetSettings_py():
     cdef Spectrum_Settings settings
-    rs = SPECTRUM_GetSettings(&settings)
-    err_check(rs)
-    print('Spectrum Settings:\n{}'.format(settings))
-    rs = SPECTRUM_SetSettings(settings)
-    err_check(rs)
-
-    cdef SpectrumTraces trace = SpectrumTraces.SpectrumTrace1
-    cdef SpectrumDetectors detector = SpectrumDetectors.SpectrumDetector_PosPeak
-    rs = SPECTRUM_SetTraceType(trace, enable, detector)
-    err_check(rs)
-    rs = SPECTRUM_GetTraceType(trace, &enable, &detector)
-    err_check(rs)
-    print('Spectrum Trace {}, Enabled: {}, Detector Type: {}'.format(
-        trace, enable, detector))
+    err_check(SPECTRUM_GetSettings(&settings))
+    return settings
     
+
+def SPECTRUM_SetSettings_py(span=40e6, rbw=300e3, enableVBW=False, vbw=300e3,
+                            traceLength=801, window=SpectrumWindows.SpectrumWindow_Kaiser,
+                            verticalUnit=SpectrumVerticalUnits.SpectrumVerticalUnit_dBm):
+    # Grab fully-populated Spectrum_Settings struct for safety reasons
+    settings = SPECTRUM_GetSettings_py()
+    settings['span'] = span
+    settings['rbw'] = rbw
+    settings['enableVBW'] = enableVBW
+    settings['vbw'] = vbw
+    settings['traceLength'] = traceLength
+    settings['verticalUnit'] = verticalUnit
+    err_check(SPECTRUM_SetSettings(settings))
+
+    
+def SPECTRUM_SetTraceType_py(trace=SpectrumTraces.SpectrumTrace1, enable=True,
+                          detector=SpectrumDetectors.SpectrumDetector_PosPeak):
+    cdef bint _enable = enable
+    cdef SpectrumTraces _trace = trace
+    cdef SpectrumDetectors _detector = detector
+    err_check(SPECTRUM_SetTraceType(_trace, _enable, _detector))
+
+
+def SPECTRUM_GetTraceType_py(trace=SpectrumTraces.SpectrumTrace1):
+    cdef bint enable
+    cdef int detector
+    err_check(SPECTRUM_GetTraceType(trace, &enable, &detector))
+    return enable, detector
+
+
+def SPECTRUM_GetLimits_py():
     cdef Spectrum_Limits limits
-    rs = SPECTRUM_GetLimits(&limits)
-    err_check(rs)
-    print('Spectrum Limits:\n{}'.format(limits))
+    err_check(SPECTRUM_GetLimits(&limits))
+    return limits
+
+
+def SPECTRUM_AcquireTrace_py():
+    err_check(SPECTRUM_AcquireTrace())
     
-    cdef bint ready = False
-    cdef int timeoutMsec = 100
-    DEVICE_Run()
-    rs = SPECTRUM_AcquireTrace()
-    err_check(rs)
-    while ready == 0:
-        rs = SPECTRUM_WaitForTraceReady(timeoutMsec, &ready)
-        err_check(rs)
-    print('Spectrum Ready: {}'.format(ready))
     
-    cdef int maxTracePoints = settings.traceLength
-    cdef float traceData[801]
-    cdef int outTracePoints = 0
-    rs = SPECTRUM_GetTrace(trace, maxTracePoints, traceData, &outTracePoints)
-    err_check(rs)
+def SPECTRUM_WaitForTraceReady_py(timeoutMsec=100):
+    cdef int _timeoutMsec = timeoutMsec
+    cdef bint ready
+    err_check(SPECTRUM_WaitForTraceReady(_timeoutMsec, &ready))
+    return ready
     
+
+def SPECTRUM_GetTrace_py(trace=SpectrumTraces.SpectrumTrace1, tracePoints=801):
+    cdef int _tracePoints = tracePoints
+    cdef np.ndarray traceData = np.empty(shape=(tracePoints), dtype=np.float32,
+                                     order='c')
+    cdef int outTracePoints
+    err_check(SPECTRUM_GetTrace(trace, _tracePoints, <float *> traceData.data, \
+    &outTracePoints))
+    return np.asarray(traceData, dtype=np.float32)
+
+
+def SPECTRUM_GetTraceInfo_py():
     cdef Spectrum_TraceInfo traceInfo
-    rs = SPECTRUM_GetTraceInfo(&traceInfo)
-    err_check(rs)
-    print('Spectrum Trace Info:\n{}'.format(traceInfo))
-    
-    fig = plt.figure(2, figsize=(10,10))
-    plt.plot(traceData)
-    plt.title('Spectrum Trace')
-    plt.show()
-    
-    
-def dpx_acquisition():
-    ##########################################################
-    # DPX Bitmap, Trace, and Spectrogram
-    ##########################################################
-    
-    # there is a problem when the spectrum or IQ examples are run before the
-    # DPX example. This occurs right before grabbing the DPX_FrameBuffer
-    # If the DPX example is run first, there is no problem.
-    print('\n########DPX########')
-    CONFIG_Preset()
-    CONFIG_SetCenterFreq(2.4453e9)
-    
-    cdef double cf
-    cdef double refLevel
-    CONFIG_GetCenterFreq(&cf)
-    CONFIG_GetReferenceLevel(&refLevel)
-    print('CF: {}\nRefLevel: {}'.format(cf, refLevel))
+    err_check(SPECTRUM_GetTraceInfo(&traceInfo))
+    return traceInfo
 
 
-    print('\nDPX Bitmap, Trace, and Spectrogram')
-    cdef bint enable = True
-    rs = DPX_SetEnable(enable)
-    err_check(rs)
-    rs = DPX_GetEnable(&enable)
-    err_check(rs)
-    print('DPX Enable: {}'.format(enable))
-    rs = DPX_Reset()
-    err_check(rs)
-    
-    cdef double fspan = 20e6
-    cdef double rbw = 100e3
-    cdef int32_t bitmapWidth = 801      # 0 <= 801
-    cdef int32_t tracePtsPerPixel = 1   # 1, 3, or 5.
+# Helper function
+def SPECTRUM_Acquire_py(trace=SpectrumTraces.SpectrumTrace1, tracePoints=801,
+                        timeoutMsec=100):
+    DEVICE_Run_py()
+    SPECTRUM_AcquireTrace_py()
+    while not SPECTRUM_WaitForTraceReady_py(timeoutMsec):
+        pass
+    return SPECTRUM_GetTrace_py(trace, tracePoints)
+
+
+##########################################################
+# DPX Bitmap, Trace, and Spectrogram
+##########################################################
+
+# there is a problem when the spectrum or IQ examples are run before the
+# DPX example. This occurs right before grabbing the DPX_FrameBuffer
+# If the DPX example is run first, there is no problem.
+
+def DPX_SetEnable_py(enable=True):
+    cdef bint _enable = enable
+    err_check(DPX_SetEnable(_enable))
+
+
+def DPX_GetEnable_py():
+    cdef bint enable
+    err_check(DPX_GetEnable(&enable))
+    return enable
+
+
+def DPX_Reset_py():
+    err_check(DPX_Reset())
+
+
+def DPX_SetParameters_py(fspan=40e6, rbw=300e3, tracePtsPerPixel=1,
+                        yUnit=VerticalUnitType.VerticalUnit_dBm,
+                        yTop=0, yBottom=-100, infinitePersistence=False,
+                        persistenceTimeSec=1, showOnlyTrigFrame=False):
+    cdef double _fspan = fspan
+    cdef double _rbw = rbw
+    cdef int32_t _bitmapWidth = 801      # 0 <= 801
+    cdef int32_t _tracePtsPerPixel = tracePtsPerPixel   # 1, 3, or 5.
     # tracePoints = bitmapWidth*tracePtsPerPixel
-    cdef VerticalUnitType yUnit = VerticalUnitType.VerticalUnit_dBm
-    cdef double yTop = 0
-    cdef double yBottom = yTop - 100
-    cdef bint infinitePersistence = False
-    cdef double persistenceTimeSec = 1
-    cdef bint showOnlyTrigFrame = False
-    rs = DPX_SetParameters(fspan, rbw, bitmapWidth, tracePtsPerPixel, yUnit,
-                           yTop, yBottom, infinitePersistence,
-                           persistenceTimeSec, showOnlyTrigFrame)
-    err_check(rs)
+    cdef VerticalUnitType _yUnit = yUnit
+    cdef double _yTop = yTop
+    cdef double _yBottom = yBottom
+    cdef bint _infinitePersistence = infinitePersistence
+    cdef double _persistenceTimeSec = persistenceTimeSec
+    cdef bint _showOnlyTrigFrame = showOnlyTrigFrame
+    err_check(DPX_SetParameters(_fspan, _rbw, _bitmapWidth, _tracePtsPerPixel,
+                           _yUnit, _yTop, _yBottom, _infinitePersistence,
+                           _persistenceTimeSec, _showOnlyTrigFrame))
     
     cdef bint enableSpectrum = True
     cdef bint enableSpectrogram = True
-    rs = DPX_Configure(enableSpectrum, enableSpectrogram)
-    err_check(rs)
-    
+    err_check(DPX_Configure(enableSpectrum, enableSpectrogram))
+
+
+# THIS MUST BE SENT AFTER DPX_SetParameters() OR THE PROGRAM WILL CRASH
+# Incorporated into DPX_SetParameters_py() directly
+# def DPX_Configure_py(_enableSpectrum, _enableSpectrogram):
+#     cdef bint enableSpectrum = _enableSpectrum
+#     cdef bint enableSpectrogram = _enableSpectrogram
+#     err_check(DPX_Configure(enableSpectrum, enableSpectrogram))
+
+
+def DPX_SetSpectrumTraceType_py(traceIndex=DPX_TRACEIDX_1,
+                              traceType=TraceType.TraceTypeMax):
+    cdef int32_t _traceIndex = traceIndex
+    cdef TraceType _traceType = traceType
+    err_check(DPX_SetSpectrumTraceType(_traceIndex, _traceType))
+
+
+def DPX_GetSettings_py():
     cdef DPX_SettingsStruct pSettings
-    rs = DPX_GetSettings(&pSettings)
-    err_check(rs)
-    print('DPX Settings:\n{}'.format(pSettings))
-    
-    cdef int32_t traceIndex = 0
-    cdef TraceType tType = TraceType.TraceTypeMax
-    rs = DPX_SetSpectrumTraceType(traceIndex, tType)
-    err_check(rs)
-    
+    err_check(DPX_GetSettings(&pSettings))
+    return pSettings
+
+
+def DPX_GetRBWRange_py(fspan=40e6):
     cdef double minRBW
     cdef double maxRBW
-    rs = DPX_GetRBWRange(fspan, &minRBW, &maxRBW)
-    err_check(rs)
-    print('Min DPX RBW: {}\nMax DPX RBW: {}'.format(minRBW, maxRBW))
-    
-    cdef double timePerBitmapLine = 0.1
-    cdef double timeResolution = 0.01
-    cdef double maxPower = 0
-    cdef double minPower = maxPower - 100
-    rs = DPX_SetSogramParameters(timePerBitmapLine, timeResolution,
-                                 maxPower, minPower)
-    err_check(rs)
-    
-    cdef TraceType traceType = TraceType.TraceTypeMax
-    rs = DPX_SetSogramTraceType(traceType)
-    err_check(rs)
+    err_check(DPX_GetRBWRange(fspan, &minRBW, &maxRBW))
+    return minRBW, maxRBW
 
-    cdef bint frameAvailable = False
-    cdef bint ready = False
-    cdef int timeoutMsec = 100
-    cdef DPX_FrameBuffer fb
 
-    DEVICE_Run()
-    while frameAvailable == 0:
-        DPX_IsFrameBufferAvailable(&frameAvailable)
-    while ready == 0:
-        DPX_WaitForDataReady(timeoutMsec, &ready)
-    rs = DPX_GetFrameBuffer(&fb)
-    err_check(rs)
-    rs = DPX_FinishFrameBuffer()
-    err_check(rs)
-    # DEVICE_Stop()
-    
-    cdef DPX_SogramSettingsStruct sSettings
-    rs = DPX_GetSogramSettings(&sSettings)
-    err_check(rs)
-    print('DPX_SogramSettings: {}'.format(sSettings))
-    
-    cdef int64_t frameCount = 0
-    cdef int64_t fftCount = 0
-    rs = DPX_GetFrameInfo(&frameCount, &fftCount)
-    err_check(rs)
-    print('Frame Count: {}\nFFT Count: {}'.format(frameCount, fftCount))
-    
-    cdef int32_t lineCount = 0
-    cdef double timestamp = 0
-    rs = DPX_GetSogramHiResLineCountLatest(&lineCount)
-    err_check(rs)
-    print('Line Count: {}'.format((lineCount)))
-    
-    cdef bint triggered = False
-    cdef int32_t lineIndex = 0
-    rs = DPX_GetSogramHiResLineTriggered(&triggered, lineIndex)
-    err_check(rs)
-    print('Line {} Triggered: {}'.format(lineIndex, triggered))
-    
-    rs = DPX_GetSogramHiResLineTimestamp(&timestamp, lineIndex)
-    err_check(rs)
-    print('Line {} Timestamp: {}'.format(lineIndex, timestamp))
-    
-    # sogramBitmapWidth and sogramTravepoints are only ever 267
-    cdef int16_t vData[267]
-    cdef int32_t vDataSize = 0
-    cdef double dataSF = 0
-    cdef int32_t tracePoints = 267
-    cdef int32_t firstValidPoint = 0
-    rs = DPX_GetSogramHiResLine(vData, &vDataSize, lineIndex,
-        &dataSF, tracePoints, firstValidPoint)
-    err_check(rs)
-    print('vData Size: {}'.format(vDataSize))
-    
-    print('FFT Per Frame: {}'.format(fb.fftPerFrame))
-    print('FFT Count: {}'.format(fb.fftCount))
-    print('Frame Count: {}'.format(fb.frameCount))
-    print('Timestamp: {}'.format(fb.timestamp))
-    print('Acq Data Status: {}'.format(fb.acqDataStatus))
-    print('Minimum Signal Duration: {}'.format(fb.minSigDuration))
-    print('Minimum Signal Duration out of range: {}'.format(fb.minSigDurOutOfRange))
-    print('Spectrum Bitmap Width: {}, Height: {}, Size: {}'.format(
-        fb.spectrumBitmapWidth, fb.spectrumBitmapHeight, fb.spectrumBitmapSize))
-    print('Spectrum Trace Length: {}'.format((fb.spectrumTraceLength)))
-    print('Number Spectrum Traces: {}'.format(fb.numSpectrumTraces))
-    print('Spectrum Enabled: {}, Spectrogram Enabled: {}'.format(
-        fb.spectrumEnabled, fb.spectrogramEnabled))
-    print('Spectrogram Bitmap Width: {}, Height: {}, Size: {}'.format(
-        fb.sogramBitmapWidth, fb.sogramBitmapHeight, fb.sogramBitmapSize))
-    print('Spectrogram Valid Lines: {}'.format(fb.sogramBitmapNumValidLines))
-    
-    dpxBitmap = np.asarray(fb.spectrumBitmap)
-    dpxBitmap = dpxBitmap.reshape((fb.spectrumBitmapHeight,
-                                   fb.spectrumBitmapWidth))
-    
-    # You can only index/slice a Cython array after converting to a np.array
-    traces = []
+def DPX_SetSogramParameters_py(timePerBitmapLine=0.1, timeResolution=0.01,
+                               maxPower=0, minPower=-100):
+    cdef double _timePerBitmapLine = timePerBitmapLine
+    cdef double _timeResolution = timeResolution
+    cdef double _maxPower = maxPower
+    cdef double _minPower = minPower
+    err_check(DPX_SetSogramParameters(_timePerBitmapLine, _timeResolution,
+                                      _maxPower, _minPower))
+
+
+def DPX_SetSogramTraceType_py(traceType=TraceType.TraceTypeMax):
+    err_check(DPX_SetSogramTraceType(traceType))
+
+
+def DPX_IsFrameBufferAvailable_py():
+    cdef bint frameAvailable
+    err_check(DPX_IsFrameBufferAvailable(&frameAvailable))
+    return frameAvailable
+
+
+def DPX_WaitForDataReady_py(timeoutMsec=50):
+    cdef bint ready
+    err_check(DPX_WaitForDataReady(timeoutMsec, &ready))
+    return ready
+
+
+def DPX_GetFrameBuffer_py():
+    cpdef DPX_FrameBuffer fb
+    err_check(DPX_GetFrameBuffer(&fb))
+    err_check(DPX_FinishFrameBuffer())
+
+    spectrumBitmap = np.asarray(fb.spectrumBitmap)
+    spectrumBitmap = spectrumBitmap.reshape((fb.spectrumBitmapHeight,
+                                        fb.spectrumBitmapWidth))
+
+    spectrumTraces = []
     for i in range(3):
-        traces.append(10 * np.log10(1000 * np.asarray(
+        spectrumTraces.append(10 * np.log10(1000 * np.asarray(
             fb.spectrumTraces[i])[:fb.spectrumTraceLength]) + 30)
 
     """The Cython typedef of uint8_t is an unsigned char. Because
@@ -644,306 +814,67 @@ def dpx_acquisition():
     Python interprets, the returned value as a string. Fortunately
     Numpy has the .fromstring() method that interprets the string as
     numerical values."""
-    dpxogram = np.fromstring(fb.sogramBitmap, dtype=np.uint8)
-    dpxogram = dpxogram.reshape((
-        fb.sogramBitmapHeight, fb.sogramBitmapWidth))[:fb.sogramBitmapNumValidLines]
+    sogramBitmap = np.fromstring(fb.sogramBitmap, dtype=np.uint8)
+    sogramBitmap = sogramBitmap.reshape((
+        fb.sogramBitmapHeight, fb.sogramBitmapWidth))[
+               :fb.sogramBitmapNumValidLines]
 
-    fig = plt.figure()
-    ax1 = fig.add_subplot(131)
-    ax1.imshow(dpxBitmap, cmap='gist_stern')
-    ax1.set_aspect(7)
-    ax2 = fig.add_subplot(132)
-    for t in traces:
-        ax2.plot(t)
-    ax3 = fig.add_subplot(133)
-    ax3.imshow(dpxogram, cmap='gist_stern')
-    ax3.set_aspect(7)
-    plt.tight_layout()
-    plt.show()
+    fb_py = DPX_FrameBuffer_py(fb, spectrumBitmap, spectrumTraces,
+                               sogramBitmap)
+    return fb_py
 
 
-def audio_demod():
-    ##########################################################
-    # Audio Demod
-    ##########################################################
-    print('\n########Audio Demod########')
-    cf = 99.10e6
-    refLevel = -30
-    CONFIG_SetCenterFreq(cf)
-    CONFIG_SetReferenceLevel(refLevel)
-
-    cdef AudioDemodMode mode = AudioDemodMode.ADM_FM_200KHZ
-    cdef float volume = 0.5
-    cdef bint mute = False
-
-    cdef int16_t data[10000]
-    cdef uint16_t inSize = 10000
-    cdef uint16_t outSize
-    
-    cdef bint enable = False
-
-    rs = AUDIO_SetMode(mode)
-    err_check(rs)
-
-    rs = AUDIO_GetMode(&mode)
-    err_check(rs)
-    print('Audio Demod Mode: {}'.format(mode))
-
-    rs = AUDIO_SetVolume(volume)
-    err_check(rs)
-
-    rs = AUDIO_GetVolume(&volume)
-    err_check(rs)
-    print('Audio Volume: {}'.format(volume))
-
-    rs = AUDIO_SetMute(mute)
-    err_check(rs)
-    rs = AUDIO_GetMute(&mute)
-    err_check(rs)
-    print('Audio Mute: {}'.format(mute))
-
-    cdef double freqOffsetHz = 0
-    rs = AUDIO_SetFrequencyOffset(freqOffsetHz)
-    err_check(rs)
-    rs = AUDIO_GetFrequencyOffset(&freqOffsetHz)
-    err_check(rs)
-    print('Audio Frequency Offset: {}'.format(freqOffsetHz))
-
-    DEVICE_Run()
-    rs = AUDIO_Start()
-    err_check(rs)
-    rs = AUDIO_GetEnable(&enable)
-    err_check(rs)
-    print('Audio Enabled: {}'.format(enable))
-    rs = AUDIO_GetData(data, inSize, &outSize)
-    err_check(rs)
-    rs = AUDIO_Stop()
-    err_check(rs)
-    plt.plot(data)
-    plt.show()
-
-def if_streaming():
-    
-    ##########################################################
-    # IF Streaming
-    ##########################################################
-    print('\n########IF Streaming########')
-    CONFIG_Preset()
-    CONFIG_SetCenterFreq(2.4453e9)
-    DEVICE_Run()
-    
-    cdef bint enable = True
-    cdef bint active = True
-    cdef StreamingMode mode = StreamingMode.StreamingModeFramed
-    cdef char* path = 'C:\\SignalVu-PC Files\\'
-    cdef char* base = 'if_stream_test'
-    cdef int suffixCtl = IFSSDFN_SUFFIX_NONE
-    cdef int msec = 250
-    cdef int count = 1
-
-    rs = IFSTREAM_SetDiskFileMode(mode)
-    err_check(rs)
-    rs = IFSTREAM_SetDiskFilePath(path)
-    err_check(rs)
-    rs = IFSTREAM_SetDiskFilenameBase(base)
-    err_check(rs)
-    rs = IFSTREAM_SetDiskFilenameSuffix(suffixCtl)
-    err_check(rs)
-    rs = IFSTREAM_SetDiskFileLength(msec)
-    err_check(rs)
-    rs = IFSTREAM_SetDiskFileCount(count)
-    err_check(rs)
-    print('Streaming...')
-    rs = IFSTREAM_SetEnable(enable)
-    err_check(rs)
-    while active == 1:
-        rs = IFSTREAM_GetActiveStatus(&active)
-        err_check(rs)
-    print('Streaming Complete.')
-    print('File Location: {}{}'.format(path.decode(), base.decode()))
+# Helper Function for DPX Acquisition
+def DPX_AcquireFB_py():
+    DEVICE_Run_py()
+    while not DPX_IsFrameBufferAvailable_py():
+        pass
+    while not DPX_WaitForDataReady_py():
+        pass
+    fb_py = DPX_GetFrameBuffer_py()
+    return fb_py
 
 
-def iq_streaming():
-    ###########################################################
-    # IQ Data Streaming to Client or Disk
-    ###########################################################
-    print('\n########IQ Streaming########')
-    CONFIG_Preset()
-    CONFIG_SetCenterFreq(2.4453e9)
-    DEVICE_Run()
-    
-    cdef double maxBandwidthHz = 0
-    cdef double minBandwidthHz = 0
-    cdef double bwHz_req = 20e6
-    cdef double bwHz_act = 0
-    cdef double srSps = 0
-    cdef IQSOUTDEST dest = IQSOUTDEST.IQSOD_FILE_SIQ_SPLIT
-    cdef IQSOUTDTYPE dtype = IQSOUTDTYPE.IQSODT_INT16
-    cdef int reqSize = 1000
-    cdef int maxSize = 0
-    cdef char* filenameBase = 'C:\\SignalVu-PC Files\\iq_stream_test'
-    cdef int suffixCtl = IQSSDFN_SUFFIX_NONE
-    cdef int msec = 100
-    
-    cdef bint enable = True
-    cdef void* iqdata
-    cdef int iqlen = 0
-    cdef IQSTRMIQINFO iqinfo
-    cdef bint isComplete = False
-    cdef bint isWriting = True
-    cdef IQSTRMFILEINFO fileinfo
-    
-    rs = IQSTREAM_GetMaxAcqBandwidth(&maxBandwidthHz)
-    err_check(rs)
-    rs = IQSTREAM_GetMinAcqBandwidth(&minBandwidthHz)
-    err_check(rs)
-    print('Max Bandwidth: {}, Min Bandwidth: {}'.format(
-        maxBandwidthHz, minBandwidthHz))
-    
-    rs = IQSTREAM_SetAcqBandwidth(bwHz_req)
-    err_check(rs)
-    rs = IQSTREAM_GetAcqParameters(&bwHz_act, &srSps)
-    err_check(rs)
-    print('IQ Bandwidth: {}, IQ Sample Rate: {}'.format(bwHz_act, srSps))
-    
-    rs = IQSTREAM_SetOutputConfiguration(dest, dtype)
-    err_check(rs)
-    rs = IQSTREAM_SetIQDataBufferSize(reqSize)
-    err_check(rs)
-    rs = IQSTREAM_GetIQDataBufferSize(&maxSize)
-    err_check(rs)
-    print('Max IQ Buffer Size: {}'.format(maxSize))
-    
-    rs = IQSTREAM_SetDiskFilenameBase(filenameBase)
-    err_check(rs)
-    rs = IQSTREAM_SetDiskFilenameSuffix(suffixCtl)
-    err_check(rs)
-    rs = IQSTREAM_SetDiskFileLength(msec)
-    err_check(rs)
-
-    rs = IQSTREAM_Start()
-    err_check(rs)
-    rs = IQSTREAM_GetEnable(&enable)
-    err_check(rs)
-    print('IQ Streaming Enabled: {}'.format(enable))
-    while isComplete == 0:
-        rs = IQSTREAM_GetDiskFileWriteStatus(&isComplete,&isWriting)
-        err_check(rs)
-    print('IQ Stream Complete: {}'.format(isComplete))
-    rs = IQSTREAM_Stop()
-    err_check(rs)
-    
-    # rs = IQSTREAM_GetIQData(iqdata, &iqlen, &iqinfo)
-    # err_check(rs)
-    rs = IQSTREAM_GetDiskFileInfo(&fileinfo)
-    err_check(rs)
-    # print('IQ Streaming File Info:\n{}'.format(fileinfo))
-    print('Number of Samples: {}'.format(fileinfo.numberSamples))
-    print('Sample 0 Timestamp: {}'.format(fileinfo.sample0Timestamp))
-    print('Trigger Sample Index: {}'.format(fileinfo.triggerSampleIndex))
-    print('Trigger Timestamp: {}'.format(fileinfo.triggerTimestamp))
-    print('Acquisition Status: {}'.format(fileinfo.acqStatus))
-    print('File Names: {} {}'.format(fileinfo.filenames[0],
-                                     fileinfo.filenames[1]))
-    IQSTREAM_ClearAcqStatus()
+def DPX_GetFrameInfo_py():
+    cdef int64_t frameCount
+    cdef int64_t fftCount
+    err_check(DPX_GetFrameInfo(&frameCount, &fftCount))
+    return frameCount, fftCount
 
 
-def if_playback():
-    ###########################################################
-    # Stored IF Data File Playback
-    ###########################################################
-    # THIS IS NOT WORKING YET
-    print('\n########IF Playback########')
-    CONFIG_Preset()
-    cdef Py_UNICODE* fileName = u'C:\\SignalVu-PC Files\\if_stream_test.r3f'
-    cdef int startPercentage = 0
-    cdef int stopPercentage = 100
-    cdef double skipTimeBetweenFullAcquisitions = 0.0
-    cdef bint loopAtEndOfFile = False
-    cdef bint emulateRealTime = False
-    cdef bint complete = False
-
-    print('GET READY FOR A CRASH')
-    rs = PLAYBACK_OpenDiskFile(fileName, startPercentage, stopPercentage, skipTimeBetweenFullAcquisitions, loopAtEndOfFile, emulateRealTime)
-    print(rs)
-    err_check(rs)
-    print('Opened file, beginning playback.')
-    DEVICE_Run()
-    rs = PLAYBACK_GetReplayComplete(&complete)
-    err_check(rs)
-    print('Playback complete: {}'.format(complete))
-    
-
-def gnss():
-    ###########################################################
-    # GNSS Rx Control and Output
-    ###########################################################
-    print('\n########GNSS########')
-    cdef bint installed = False
-    cdef bint enable = True
-    GNSS_GetHwInstalled(&installed)
-    cdef GNSS_SATSYS satSystem = GNSS_SATSYS.GNSS_GPS_BEIDOU
-    cdef bint powered = True
-    cdef int msgLen = 0
-    cdef char* message
-    cdef bint isValid = False
-    cdef uint64_t timestamp1PPS = 0
-    
-    print('GNSS Hardware Installed: {}'.format(installed))
-    
-    GNSS_SetEnable(enable)
-    GNSS_GetEnable(&enable)
-    print('GNSS Enabled: {}'.format(enable))
-    
-    GNSS_SetSatSystem(satSystem)
-    GNSS_GetSatSystem(&satSystem)
-    print('GNSS Satellite System: {}'.format(satSystem))
-    
-    GNSS_SetAntennaPower(powered)
-    GNSS_GetAntennaPower(&powered)
-    print('GNSS Antenna Power: {}'.format(powered))
-    
-    GNSS_GetNavMessageData(&msgLen, &message)
-    print('GNSS Message: {}'.format(message))
-    GNSS_ClearNavMessageData()
-    GNSS_Get1PPSTimestamp(&isValid, &timestamp1PPS)
-    print('1PPS Timestamp Valid: {}, 1PPS Timestamp: {}'.format(
-        isValid, timestamp1PPS))
-    
-
-def power_battery():
-    ###########################################################
-    # Power and Battery Status
-    ###########################################################
-    print('\n########Power and Battery########')
-    cdef POWER_INFO powerInfo
-    
-    rs = POWER_GetStatus(&powerInfo)
-    print('Power Info:\n{}'.format(powerInfo))
+def DPX_GetSogramSettings_py():
+    cdef DPX_SogramSettingsStruct sSettings
+    err_check(DPX_GetSogramSettings(&sSettings))
+    return sSettings
 
 
-def test():
-    cdef Py_UNICODE string[100]
-    rs = DEVICE_GetNomenclatureW(string)
-    err_check(rs)
-    print(string)
+def DPX_GetSogramHiResLineCountLatest_py():
+    cdef int32_t lineCount
+    err_check(DPX_GetSogramHiResLineCountLatest(&lineCount))
+    return lineCount
 
 
-def main():
-    device_connection_info()
-    device_configuration()
-    trigger_configuration()
-    device_alignment()
-    device_operation()
-    reference_time()
-    dpx_acquisition()
-    iq_block_data()
-    spectrum_acquisition()
-    audio_demod()
-    if_streaming()
-    iq_streaming()
-    # if_playback()
-    gnss()
-    power_battery()
+def DPX_GetSogramHiResLineTriggered_py(lineIndex):
+    cdef bint triggered
+    cdef int32_t _lineIndex = lineIndex
+    err_check(DPX_GetSogramHiResLineTriggered(&triggered, _lineIndex))
+    return triggered
 
-    DEVICE_Disconnect()
+
+def DPX_GetSogramHiResLineTimestamp_py(lineIndex):
+    cdef double timestamp
+    cdef int32_t _lineIndex = lineIndex
+    err_check(DPX_GetSogramHiResLineTimestamp(&timestamp, _lineIndex))
+    return timestamp
+
+
+def DPX_GetSogramHiResLine_py(lineIndex=0):
+    # sogramBitmapWidth and sogramTracePoints are only ever 267
+    cdef int16_t vData[267]
+    cdef int32_t vDataSize
+    cdef int32_t _lineIndex = lineIndex
+    cdef double dataSF
+    cdef int32_t tracePoints = 267
+    cdef int32_t firstValidPoint = 0
+    err_check(DPX_GetSogramHiResLine(vData, &vDataSize, _lineIndex, &dataSF, tracePoints, firstValidPoint))
+    return vData

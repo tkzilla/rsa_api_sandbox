@@ -126,7 +126,7 @@ def spectrum_example():
     print('\n\n########Spectrum Example########')
     search_connect()
     cf = 2.4453e9
-    refLevel = -30
+    refLevel = 0
     span = 40e6
     rbw = 10e3
     specSet = config_spectrum(cf, refLevel, span, rbw)
@@ -192,11 +192,12 @@ def acquire_block_iq(recordLength=10e3):
 def block_iq_example():
     print('\n\n########Block IQ Example########')
     search_connect()
-    cf = 1e9
+    cf = 2.4453e9
     refLevel = 0
     iqBw = 40e6
-    recordLength = 1e3
+    recordLength = 100000
 
+    # config_trigger()
     time = config_block_iq(cf, refLevel, iqBw, recordLength)
     IQ = acquire_block_iq(recordLength)
 
@@ -208,7 +209,7 @@ def block_iq_example():
     ax1.set_xlim([time[0] * 1e3, time[-1] * 1e3])
     ax2 = plt.subplot(212, facecolor='k')
     ax2.plot(time * 1000, np.imag(IQ), color='c')
-    ax2.set_ylabel('I (V)')
+    ax2.set_ylabel('Q (V)')
     ax2.set_xlabel('Time (msec)')
     ax2.set_xlim([time[0] * 1e3, time[-1] * 1e3])
     plt.tight_layout()
@@ -428,17 +429,18 @@ def iqstream_status_parser(iqStreamInfo):
 def iq_stream_example():
     print('\n\n########IQ Stream Example########')
     search_connect()
-
+    
+    cf = 2.4453e9
     bw = 40e6
-    dest = IQSOUTDEST.IQSOD_FILE_SIQ_SPLIT
-    durationMsec = 100
+    dest = IQSOUTDEST.IQSOD_FILE_SIQ
+    durationMsec = 10
     waitTime = 0.1
     iqStreamInfo = IQSTREAM_File_Info()
 
     complete = c_bool(False)
     writing = c_bool(False)
 
-    config_iq_stream(bw=bw, dest=dest, durationMsec=durationMsec)
+    config_iq_stream(cf=cf, bw=bw, dest=dest, durationMsec=durationMsec)
 
     rsa.DEVICE_Run()
     rsa.IQSTREAM_Start()
@@ -558,13 +560,13 @@ def peak_power_detector(freq, trace):
 
 def main():
     # uncomment the example you'd like to run
-    spectrum_example()
+    # spectrum_example()
     # block_iq_example()
-    # dpx_example()
+    dpx_example()
     # if_stream_example()
     # iq_stream_example()
     # audio_example()
-    if_playback()
+    # if_playback()
 
 
 if __name__ == '__main__':

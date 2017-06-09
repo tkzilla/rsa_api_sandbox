@@ -1,18 +1,9 @@
-# from libc.stddef cimport wchar_t
-# from libc.stdlib cimport *
-# from libc.string cimport *
-# from cpython.ref cimport PyObject
-
-# cdef extern from "Python.h":
-    # PyObject* PyUnicode_FromWideChar(wchar_t* w, Py_ssize_t size)
-    # wchar_t* PyUnicode_AsWideCharString(object, Py_ssize_t *)
-
 cdef extern from 'RSA_API.h':
-    
+
     ##########################################################
     # Status and Error Reporting
     ##########################################################
-    
+
     ctypedef   signed char  int8_t
     ctypedef   signed short int16_t
     ctypedef   signed int   int32_t
@@ -21,8 +12,7 @@ cdef extern from 'RSA_API.h':
     ctypedef unsigned short uint16_t
     ctypedef unsigned int   uint32_t
     ctypedef unsigned long long uint64_t
-    # ctypedef unsigned short wchar_t
-    
+
     ctypedef enum ReturnStatus:
         noError = 0
 
@@ -195,7 +185,6 @@ cdef extern from 'RSA_API.h':
 
     # AcqDataStatus enum defined in rsa_api.pyx
 
-
     ##########################################################
     # Device Connection and Info
     ##########################################################
@@ -218,7 +207,7 @@ cdef extern from 'RSA_API.h':
     # print('Device serial numbers: {}'.format(deviceSerial[0].decode()))
     # print('Device type: {}'.format(deviceType[0].decode()))
 
-    # THERE IS A PROBLEM WITH CONVERTING INT * TYPES TO PYTHON OBJECTS
+    # THERE IS A PROBLEM WITH CONVERTING POINTERS TO PYTHON OBJECTS/VICE VERSA
     # ReturnStatus DEVICE_SearchInt(int* numDevicesFound, int* deviceIDs[], const char** deviceSerial[], const char** deviceType[])
     # DEVICE_SearchIntW not imported
     # cdef int numDevicesFound = 0
@@ -231,13 +220,12 @@ cdef extern from 'RSA_API.h':
     # print('Device serial numbers: {}'.format(deviceSerial[0].decode()))
     # print('Device type: {}'.format(deviceType[0].decode()))
 
-
     ReturnStatus DEVICE_Connect(int deviceID)
     ReturnStatus DEVICE_Reset(int deviceID)
     ReturnStatus DEVICE_Disconnect()
 
     # DEVINFO_MAX_STRLEN defined in rsa_api.pyx
-    
+
     ReturnStatus DEVICE_GetNomenclature(char* nomenclature)
     ReturnStatus DEVICE_GetNomenclatureW(Py_UNICODE* nomenclature)
     ReturnStatus DEVICE_GetSerialNumber(char* serialNum)
@@ -253,7 +241,7 @@ cdef extern from 'RSA_API.h':
         char fwVersion[100]
         char fpgaVersion[100]
         char hwVersion[100]
-        
+
     ReturnStatus DEVICE_GetInfo(DEVICE_INFO* devInfo)
 
     ReturnStatus DEVICE_GetOverTemperatureStatus(bint* overTemperature)
@@ -264,156 +252,164 @@ cdef extern from 'RSA_API.h':
     ##########################################################
 
     ReturnStatus CONFIG_Preset()
-    
+
     ReturnStatus CONFIG_SetReferenceLevel(double refLevel)
     ReturnStatus CONFIG_GetReferenceLevel(double* refLevel)
     ReturnStatus CONFIG_GetMaxCenterFreq(double* maxCF)
     ReturnStatus CONFIG_GetMinCenterFreq(double* minCF)
     ReturnStatus CONFIG_SetCenterFreq(double cf)
     ReturnStatus CONFIG_GetCenterFreq(double* cf)
-    
+
     ReturnStatus CONFIG_SetExternalRefEnable(bint exRefEn)
     ReturnStatus CONFIG_GetExternalRefEnable(bint* exRefEn)
     ReturnStatus CONFIG_GetExternalRefFrequency(double* extFreq)
-    
+
     ReturnStatus CONFIG_GetAutoAttenuationEnable(bint* enable)
     ReturnStatus CONFIG_SetAutoAttenuationEnable(bint enable)
     ReturnStatus CONFIG_GetRFPreampEnable(bint* enable)
     ReturnStatus CONFIG_SetRFPreampEnable(bint enable)
     ReturnStatus CONFIG_GetRFAttenuator(double* value)
     ReturnStatus CONFIG_SetRFAttenuator(double value)
-    
-    
+
+
     ##########################################################
     # Trigger Configuration
     ##########################################################
-    
-    ctypedef enum TriggerMode:
-        freeRun = 0
-        triggered = 1
-        
-    ctypedef enum TriggerSource:
-        TriggerSourceExternal = 0
-        TriggerSourceIFPowerLevel = 1
-        
-    ctypedef enum TriggerTransition:
-        TriggerTransitionLH = 1
-        TriggerTransitionHL = 2
-        TriggerTransitionEither = 3
-    
-    ReturnStatus TRIG_SetTriggerMode(TriggerMode mode)
-    ReturnStatus TRIG_GetTriggerMode(TriggerMode* mode)
-    ReturnStatus TRIG_SetTriggerSource(TriggerSource source)
-    ReturnStatus TRIG_GetTriggerSource(TriggerSource* source)
-    ReturnStatus TRIG_SetTriggerTransition(TriggerTransition transition)
-    ReturnStatus TRIG_GetTriggerTransition(TriggerTransition* transition)
+    #
+    # Defined in rsa_api.pyx
+    # ctypedef enum TriggerMode:
+    #     freeRun = 0
+    #     triggered = 1
+    #
+    # ctypedef enum TriggerSource:
+    #     TriggerSourceExternal = 0
+    #     TriggerSourceIFPowerLevel = 1
+    #
+    # ctypedef enum TriggerTransition:
+    #     TriggerTransitionLH = 1
+    #     TriggerTransitionHL = 2
+    #     TriggerTransitionEither = 3
+
+    # ReturnStatus TRIG_SetTriggerMode(TriggerMode mode)
+    # ReturnStatus TRIG_GetTriggerMode(TriggerMode mode)
+    ReturnStatus TRIG_SetTriggerMode(int mode)
+    ReturnStatus TRIG_GetTriggerMode(int* mode)
+    # ReturnStatus TRIG_SetTriggerSource(TriggerSource source)
+    # ReturnStatus TRIG_GetTriggerSource(TriggerSource* source)
+    ReturnStatus TRIG_SetTriggerSource(int source)
+    ReturnStatus TRIG_GetTriggerSource(int* source)
+    # ReturnStatus TRIG_SetTriggerTransition(TriggerTransition transition)
+    # ReturnStatus TRIG_GetTriggerTransition(TriggerTransition* transition)
+    ReturnStatus TRIG_SetTriggerTransition(int transition)
+    ReturnStatus TRIG_GetTriggerTransition(int* transition)
     ReturnStatus TRIG_SetIFPowerTriggerLevel(double level)
     ReturnStatus TRIG_GetIFPowerTriggerLevel(double* level)
     ReturnStatus TRIG_SetTriggerPositionPercent(double trigPosPercent)
     ReturnStatus TRIG_GetTriggerPositionPercent(double* trigPosPercent)
     ReturnStatus TRIG_ForceTrigger()
-    
-    
+
+
     ##########################################################
     # Device Alignment
     ##########################################################
-    
+
     ReturnStatus ALIGN_GetWarmupStatus(bint* warmedUp)
     ReturnStatus ALIGN_GetAlignmentNeeded(bint* needed)
     ReturnStatus ALIGN_RunAlignment()
-    
-    
+
+
     ##########################################################
     # Device Operation (global)
     ##########################################################
-    
+
     ReturnStatus DEVICE_GetEnable(bint* enable)
     ReturnStatus DEVICE_Run()
     ReturnStatus DEVICE_Stop()
     ReturnStatus DEVICE_PrepareForRun()
     ReturnStatus DEVICE_StartFrameTransfer()
-    
+
     # DEVEVENT enum defined in rsa_api.pyx
-    
+
     ReturnStatus DEVICE_GetEventStatus(int eventID, bint* eventOccurred, uint64_t* eventTimestamp)
-    
-    
+
+
     ##########################################################
     # System/Reference Time
     ##########################################################
-    
+
     ReturnStatus REFTIME_GetTimestampRate(uint64_t* o_refTimestampRate)
     ReturnStatus REFTIME_GetCurrentTime(Py_ssize_t* o_timeSec, uint64_t* o_timeNsec, uint64_t* o_timestamp)
     ReturnStatus REFTIME_GetTimeFromTimestamp(uint64_t i_timestamp, Py_ssize_t* o_timeSec, uint64_t* o_timeNsec)
     ReturnStatus REFTIME_GetTimestampFromTime(Py_ssize_t i_timeSec, uint64_t i_timeNsec, uint64_t* o_timestamp)
     ReturnStatus REFTIME_GetIntervalSinceRefTimeSet(double* sec)
-    
+
     ReturnStatus REFTIME_SetReferenceTime(Py_ssize_t refTimeSec, uint64_t refTimeNsec, uint64_t refTimestamp)
     ReturnStatus REFTIME_GetReferenceTime(Py_ssize_t* refTimeSec, uint64_t* refTimeNsec, uint64_t* refTimestamp)
-    
-    
+
+
     ##########################################################
     # IQ Block Data Acquisition
     ##########################################################
-    
+
     ReturnStatus IQBLK_GetMaxIQBandwidth(double* maxBandwidth)
     ReturnStatus IQBLK_GetMinIQBandwidth(double* minBandwidth)
     ReturnStatus IQBLK_GetMaxIQRecordLength(int* maxSamples)
-    
+
     ReturnStatus IQBLK_SetIQBandwidth(double iqBandwidth)
     ReturnStatus IQBLK_GetIQBandwidth(double* iqBandwidth)
     ReturnStatus IQBLK_GetIQSampleRate(double* iqSampleRate)
     ReturnStatus IQBLK_SetIQRecordLength(int recordLength)
     ReturnStatus IQBLK_GetIQRecordLength(int* recordLength)
-    
+
     ReturnStatus IQBLK_AcquireIQData()
     ReturnStatus IQBLK_WaitForIQDataReady(int timeoutMsec, bint* ready)
-    
+
     ReturnStatus IQBLK_GetIQData(float* iqData, int* outLength, int reqLength)
     ReturnStatus IQBLK_GetIQDataDeinterleaved(float* iData, float* qData, int* outLength, int reqLength)
     ReturnStatus IQBLK_GetIQDataCplx(Cplx32* iqData, int* outLength, int reqLength)
-    
+
     # IQBLK_STATUS enum defined in rsa_api.pyx
-    
+
     ctypedef struct IQBLK_ACQINFO:
         uint64_t sample0Timestamp
         uint64_t triggerSampleIndex
         uint64_t triggerTimestamp
         int acqStatus
-    
+
     ReturnStatus IQBLK_GetIQAcqInfo(IQBLK_ACQINFO* acqInfo)
-    
-    
+
+
     ##########################################################
     # Spectrum Trace Acquisition
     ##########################################################
-    
-    ctypedef enum SpectrumWindows:
-        SpectrumWindow_Kaiser = 0
-        SpectrumWindow_Mil6dB = 1
-        SpectrumWindow_BlackmanHarris = 2
-        SpectrumWindow_Rectangle = 3
-        SpectrumWindow_FlatTop = 4
-        SpectrumWindow_Hann = 5
-    
-    ctypedef enum SpectrumTraces:
-        SpectrumTrace1 = 0
-        SpectrumTrace2 = 1
-        SpectrumTrace3 = 2
-    
-    ctypedef enum SpectrumDetectors:
-        SpectrumDetector_PosPeak = 0
-        SpectrumDetector_NegPeak = 1
-        SpectrumDetector_AverageVRMS = 2
-        SpectrumDetector_Sample = 3
-    
-    ctypedef enum SpectrumVerticalUnits:
-        SpectrumVerticalUnit_dBm = 0
-        SpectrumVerticalUnit_Watt = 1
-        SpectrumVerticalUnit_Volt = 2
-        SpectrumVerticalUnit_Amp = 3
-        SpectrumVerticalUnit_dBmV = 4
-    
+
+    # Defined in rsa_api.pyx
+    # ctypedef enum SpectrumWindows:
+    #     SpectrumWindow_Kaiser = 0
+    #     SpectrumWindow_Mil6dB = 1
+    #     SpectrumWindow_BlackmanHarris = 2
+    #     SpectrumWindow_Rectangle = 3
+    #     SpectrumWindow_FlatTop = 4
+    #     SpectrumWindow_Hann = 5
+    #
+    # ctypedef enum SpectrumTraces:
+    #     SpectrumTrace1 = 0
+    #     SpectrumTrace2 = 1
+    #     SpectrumTrace3 = 2
+    #
+    # ctypedef enum SpectrumDetectors:
+    #     SpectrumDetector_PosPeak = 0
+    #     SpectrumDetector_NegPeak = 1
+    #     SpectrumDetector_AverageVRMS = 2
+    #     SpectrumDetector_Sample = 3
+    #
+    # ctypedef enum SpectrumVerticalUnits:
+    #     SpectrumVerticalUnit_dBm = 0
+    #     SpectrumVerticalUnit_Watt = 1
+    #     SpectrumVerticalUnit_Volt = 2
+    #     SpectrumVerticalUnit_Amp = 3
+    #     SpectrumVerticalUnit_dBmV = 4
+
     # Spectrum settings structure
     # The actual values are returned from SPECTRUM_GetSettings() function
     # Use SPECTRUM_GetLimits() to get the limits of the settings
@@ -423,9 +419,11 @@ cdef extern from 'RSA_API.h':
         bint enableVBW
         double vbw
         int traceLength     # MUST be odd number
-        SpectrumWindows window
-        SpectrumVerticalUnits verticalUnit
-    
+        # SpectrumWindows window
+        # SpectrumVerticalUnits verticalUnit
+        int window
+        int verticalUnit
+
         # additional settings return from SPECTRUM_GetSettings()
         double actualStartFreq
         double actualStopFreq
@@ -433,7 +431,7 @@ cdef extern from 'RSA_API.h':
         double actualRBW
         double actualVBW
         int actualNumIQSamples
-    
+
     ctypedef struct Spectrum_Limits:
         double maxSpan
         double minSpan
@@ -443,26 +441,29 @@ cdef extern from 'RSA_API.h':
         double minVBW
         int maxTraceLength
         int minTraceLength
-    
+
     ctypedef struct Spectrum_TraceInfo:
         uint64_t timestamp       # timestamp of the first acquisition sample
         int acqDataStatus	# See AcqDataStatus enumeration for bit definitions
-    
+
     ReturnStatus SPECTRUM_SetEnable(bint enable)
     ReturnStatus SPECTRUM_GetEnable(bint* enable)
     ReturnStatus SPECTRUM_SetDefault()
     ReturnStatus SPECTRUM_SetSettings(Spectrum_Settings settings)
     ReturnStatus SPECTRUM_GetSettings(Spectrum_Settings* settings)
-    ReturnStatus SPECTRUM_SetTraceType(SpectrumTraces trace, bint enable, SpectrumDetectors detector)
-    ReturnStatus SPECTRUM_GetTraceType(SpectrumTraces trace, bint* enable, SpectrumDetectors* detector)
+    # ReturnStatus SPECTRUM_SetTraceType(SpectrumTraces trace, bint enable, SpectrumDetectors detector)
+    # ReturnStatus SPECTRUM_GetTraceType(SpectrumTraces trace, bint* enable, SpectrumDetectors* detector)
+    ReturnStatus SPECTRUM_SetTraceType(int trace, bint enable, int detector)
+    ReturnStatus SPECTRUM_GetTraceType(int trace, bint* enable, int* detector)
     ReturnStatus SPECTRUM_GetLimits(Spectrum_Limits* limits)
-    
+
     ReturnStatus SPECTRUM_AcquireTrace()
     ReturnStatus SPECTRUM_WaitForTraceReady(int timeoutMsec, bint* ready)
-    
-    ReturnStatus SPECTRUM_GetTrace(SpectrumTraces trace, int maxTracePoints, float* traceData, int* outTracePoints)
+
+    # ReturnStatus SPECTRUM_GetTrace(SpectrumTraces trace, int maxTracePoints, float* traceData, int* outTracePoints)
+    ReturnStatus SPECTRUM_GetTrace(int trace, int maxTracePoints, float* traceData, int* outTracePoints)
     ReturnStatus SPECTRUM_GetTraceInfo(Spectrum_TraceInfo* traceInfo)
-    
+
     ##########################################################
     # DPX Bitmap, Trace, and Spectrogram
     ##########################################################
@@ -487,7 +488,7 @@ cdef extern from 'RSA_API.h':
         bint spectrogramEnabled
 
         float spectrumBitmap[161001]
-        float spectrumTraces[3][64001]
+        float spectrumTraces[3][4005]
 
         int32_t sogramBitmapWidth
         int32_t sogramBitmapHeight
@@ -513,38 +514,41 @@ cdef extern from 'RSA_API.h':
         float decayFactor
         double actualRBW
 
-    ctypedef enum TraceType:
-        TraceTypeAverage = 0
-        TraceTypeMax = 1
-        TraceTypeMaxHold = 2
-        TraceTypeMin = 3
-        TraceTypeMinHold = 4
-
-    ctypedef enum VerticalUnitType:
-        VerticalUnit_dBm = 0
-        VerticalUnit_Watt = 1
-        VerticalUnit_Volt = 2
-        VerticalUnit_Amp = 3
+    # ctypedef enum TraceType:
+    #     TraceTypeAverage = 0
+    #     TraceTypeMax = 1
+    #     TraceTypeMaxHold = 2
+    #     TraceTypeMin = 3
+    #     TraceTypeMinHold = 4
+    #
+    # ctypedef enum VerticalUnitType:
+    #     VerticalUnit_dBm = 0
+    #     VerticalUnit_Watt = 1
+    #     VerticalUnit_Volt = 2
+    #     VerticalUnit_Amp = 3
 
     ReturnStatus DPX_GetEnable(bint* enable)
     ReturnStatus DPX_SetEnable(bint enable)
+    # ReturnStatus DPX_SetParameters(double fspan, double rbw, int32_t bitmapWidth, int32_t tracePtsPerPixel,
+    #                                            VerticalUnitType yUnit, double yTop, double yBottom,
+    #                                            bint infinitePersistence, double persistenceTimeSec, bint showOnlyTrigFrame)
     ReturnStatus DPX_SetParameters(double fspan, double rbw, int32_t bitmapWidth, int32_t tracePtsPerPixel,
-                                               VerticalUnitType yUnit, double yTop, double yBottom,
+                                               int yUnit, double yTop, double yBottom,
                                                bint infinitePersistence, double persistenceTimeSec, bint showOnlyTrigFrame)
     ReturnStatus DPX_Configure(bint enableSpectrum, bint enableSpectrogram)
     ReturnStatus DPX_GetSettings(DPX_SettingsStruct* pSettings)
 
-    ReturnStatus DPX_SetSpectrumTraceType(int32_t traceIndex, TraceType type)
-
+    # ReturnStatus DPX_SetSpectrumTraceType(int32_t traceIndex, TraceType type)
+    ReturnStatus DPX_SetSpectrumTraceType(int32_t traceIndex, int type)
     ReturnStatus DPX_GetRBWRange(double fspan, double* minRBW, double* maxRBW)
-    # YOU ARE HERE
     ReturnStatus DPX_Reset()
     ReturnStatus DPX_WaitForDataReady(int timeoutMsec, bint* ready)
 
     ReturnStatus DPX_GetFrameInfo(int64_t* frameCount, int64_t* fftCount)
 
     ReturnStatus DPX_SetSogramParameters(double timePerBitmapLine, double timeResolution, double maxPower, double minPower)
-    ReturnStatus DPX_SetSogramTraceType(TraceType traceType)
+    # ReturnStatus DPX_SetSogramTraceType(TraceType traceType)
+    ReturnStatus DPX_SetSogramTraceType(int traceType)
     ReturnStatus DPX_GetSogramSettings(DPX_SogramSettingsStruct *pSettings)
 
     ReturnStatus DPX_GetSogramHiResLineCountLatest(int32_t* lineCount)
@@ -557,8 +561,8 @@ cdef extern from 'RSA_API.h':
     # The client is required to call FinishFrameBuffer() before the next frame can be available.
     ReturnStatus DPX_FinishFrameBuffer()
     ReturnStatus DPX_IsFrameBufferAvailable(bint* frameAvailable)
-    
-    
+
+
     ##########################################################
     # Audio Demod
     ##########################################################
@@ -596,7 +600,7 @@ cdef extern from 'RSA_API.h':
     ###########################################################
     # IF(ADC) Data Streaming to disk
     ###########################################################
-    
+
     ctypedef enum StreamingMode:
         StreamingModeRaw = 0
         StreamingModeFramed = 1
@@ -606,9 +610,9 @@ cdef extern from 'RSA_API.h':
     ReturnStatus IFSTREAM_SetDiskFileMode(StreamingMode mode)
     ReturnStatus IFSTREAM_SetDiskFilePath(const char* path)
     ReturnStatus IFSTREAM_SetDiskFilenameBase(const char* base)
-    
+
     # IFSSDFN enum type defined in rsa_api.pyx
-    
+
     ReturnStatus IFSTREAM_SetDiskFilenameSuffix(int suffixCtl)
     ReturnStatus IFSTREAM_SetDiskFileLength(int msec)
     ReturnStatus IFSTREAM_SetDiskFileCount(int count)
@@ -628,21 +632,21 @@ cdef extern from 'RSA_API.h':
         IQSOD_FILE_TIQ = 1
         IQSOD_FILE_SIQ = 2
         IQSOD_FILE_SIQ_SPLIT = 3
-        
+
     ctypedef enum IQSOUTDTYPE:
         IQSODT_SINGLE = 0
         IQSODT_INT32 = 1
         IQSODT_INT16 = 2
-        
+
     ReturnStatus IQSTREAM_SetOutputConfiguration(IQSOUTDEST dest, IQSOUTDTYPE dtype)
     ReturnStatus IQSTREAM_SetIQDataBufferSize(int reqSize)
     ReturnStatus IQSTREAM_GetIQDataBufferSize(int* maxSize)
 
     # ReturnStatus IQSTREAM_SetDiskFilenameBaseW(const wchar_t* filenameBaseW)
     ReturnStatus IQSTREAM_SetDiskFilenameBase(const char* filenameBase)
-    
+
     # IQSSDFN enum type defined in rsa_api.pyx
-    
+
     ReturnStatus IQSTREAM_SetDiskFilenameSuffix(int suffixCtl)
     ReturnStatus IQSTREAM_SetDiskFileLength(int msec)
 
@@ -682,7 +686,7 @@ cdef extern from 'RSA_API.h':
     ###########################################################
     # Stored IF Data File Playback
     ###########################################################
-    
+
     # THIS IS NOT WORKING IN ANY PROGRAMMING LANGUAGE
     ReturnStatus PLAYBACK_OpenDiskFile(
         Py_UNICODE* fileName,
@@ -694,7 +698,7 @@ cdef extern from 'RSA_API.h':
 
     ReturnStatus PLAYBACK_GetReplayComplete(bint* complete)
 
-    
+
     ###########################################################
     # Tracking Generator Control
     ###########################################################
