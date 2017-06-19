@@ -567,16 +567,18 @@ cdef extern from 'RSA_API.h':
     # Audio Demod
     ##########################################################
 
-    ctypedef enum AudioDemodMode:
-        ADM_FM_8KHZ = 0
-        ADM_FM_13KHZ = 1
-        ADM_FM_75KHZ = 2
-        ADM_FM_200KHZ = 3
-        ADM_AM_8KHZ = 4
-        # ADM_NONE	// internal use only
+    # ctypedef enum AudioDemodMode:
+    #     ADM_FM_8KHZ = 0
+    #     ADM_FM_13KHZ = 1
+    #     ADM_FM_75KHZ = 2
+    #     ADM_FM_200KHZ = 3
+    #     ADM_AM_8KHZ = 4
+    #     # ADM_NONE	// internal use only
 
-    ReturnStatus AUDIO_SetMode(AudioDemodMode mode)
-    ReturnStatus AUDIO_GetMode(AudioDemodMode* mode)
+    # ReturnStatus AUDIO_SetMode(AudioDemodMode mode)
+    # ReturnStatus AUDIO_GetMode(AudioDemodMode* mode)
+    ReturnStatus AUDIO_SetMode(int mode)
+    ReturnStatus AUDIO_GetMode(int* mode)
 
     ReturnStatus AUDIO_SetVolume(float volume)
     ReturnStatus AUDIO_GetVolume(float* _volume)
@@ -601,13 +603,14 @@ cdef extern from 'RSA_API.h':
     # IF(ADC) Data Streaming to disk
     ###########################################################
 
-    ctypedef enum StreamingMode:
-        StreamingModeRaw = 0
-        StreamingModeFramed = 1
+    # ctypedef enum StreamingMode:
+    #     StreamingModeRaw = 0
+    #     StreamingModeFramed = 1
 
     ReturnStatus IFSTREAM_SetEnable(bint enable)
     ReturnStatus IFSTREAM_GetActiveStatus(bint* active)
-    ReturnStatus IFSTREAM_SetDiskFileMode(StreamingMode mode)
+    # ReturnStatus IFSTREAM_SetDiskFileMode(StreamingMode mode)
+    ReturnStatus IFSTREAM_SetDiskFileMode(int mode)
     ReturnStatus IFSTREAM_SetDiskFilePath(const char* path)
     ReturnStatus IFSTREAM_SetDiskFilenameBase(const char* base)
 
@@ -627,18 +630,19 @@ cdef extern from 'RSA_API.h':
     ReturnStatus IQSTREAM_SetAcqBandwidth(double bwHz_req)
     ReturnStatus IQSTREAM_GetAcqParameters(double* bwHz_act, double* srSps)
 
-    ctypedef enum IQSOUTDEST:
-        IQSOD_CLIENT = 0
-        IQSOD_FILE_TIQ = 1
-        IQSOD_FILE_SIQ = 2
-        IQSOD_FILE_SIQ_SPLIT = 3
+    # ctypedef enum IQSOUTDEST:
+    #     IQSOD_CLIENT = 0
+    #     IQSOD_FILE_TIQ = 1
+    #     IQSOD_FILE_SIQ = 2
+    #     IQSOD_FILE_SIQ_SPLIT = 3
+    #
+    # ctypedef enum IQSOUTDTYPE:
+    #     IQSODT_SINGLE = 0
+    #     IQSODT_INT32 = 1
+    #     IQSODT_INT16 = 2
 
-    ctypedef enum IQSOUTDTYPE:
-        IQSODT_SINGLE = 0
-        IQSODT_INT32 = 1
-        IQSODT_INT16 = 2
-
-    ReturnStatus IQSTREAM_SetOutputConfiguration(IQSOUTDEST dest, IQSOUTDTYPE dtype)
+    # ReturnStatus IQSTREAM_SetOutputConfiguration(IQSOUTDEST dest, IQSOUTDTYPE dtype)
+    ReturnStatus IQSTREAM_SetOutputConfiguration(int dest, int dtype)
     ReturnStatus IQSTREAM_SetIQDataBufferSize(int reqSize)
     ReturnStatus IQSTREAM_GetIQDataBufferSize(int* maxSize)
 
@@ -714,19 +718,21 @@ cdef extern from 'RSA_API.h':
     # GNSS Rx Control and Output
     ###########################################################
 
-    ctypedef enum GNSS_SATSYS:
-        GNSS_NOSYS = 0
-        GNSS_GPS_GLONASS = 1
-        GNSS_GPS_BEIDOU = 2
-        GNSS_GPS = 3
-        GNSS_GLONASS = 4
-        GNSS_BEIDOU = 5
+    # ctypedef enum GNSS_SATSYS:
+    #     GNSS_NOSYS = 0
+    #     GNSS_GPS_GLONASS = 1
+    #     GNSS_GPS_BEIDOU = 2
+    #     GNSS_GPS = 3
+    #     GNSS_GLONASS = 4
+    #     GNSS_BEIDOU = 5
 
     ReturnStatus GNSS_GetHwInstalled(bint* installed)
     ReturnStatus GNSS_SetEnable(bint enable)
     ReturnStatus GNSS_GetEnable(bint* enable)
-    ReturnStatus GNSS_SetSatSystem(GNSS_SATSYS satSystem)
-    ReturnStatus GNSS_GetSatSystem(GNSS_SATSYS* satSystem)
+    # ReturnStatus GNSS_SetSatSystem(GNSS_SATSYS satSystem)
+    # ReturnStatus GNSS_GetSatSystem(GNSS_SATSYS* satSystem)
+    ReturnStatus GNSS_SetSatSystem(int satSystem)
+    ReturnStatus GNSS_GetSatSystem(int* satSystem)
     ReturnStatus GNSS_SetAntennaPower(bint powered)
     ReturnStatus GNSS_GetAntennaPower(bint* powered)
     ReturnStatus GNSS_GetNavMessageData(int* msgLen, const char** message)

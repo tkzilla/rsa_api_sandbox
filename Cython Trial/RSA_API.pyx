@@ -78,6 +78,7 @@ cpdef enum VerticalUnitType:
 # members and feed them to a Python class for the DPX_FrameBuffer IN THE
 # FUNCTION THAT CALLS DPX_GetFrameBuffer() ITSELF. Passing the
 # DPX_FrameBuffer object to another function DOES NOT result in correct passing
+
 class DPX_FrameBuffer_py():
     def __init__(self, fb, spectrumBitmap, spectrumTraces, sogramBitmap):
         self.fftPerFrame = fb['fftPerFrame']
@@ -110,10 +111,42 @@ class DPX_FrameBuffer_py():
         self.sogramBitmapTimestampArray = fb['sogramBitmapTimestampArray']
         self.sogramBitmapContainTriggerArray = fb['sogramBitmapContainTriggerArray']
 
+cpdef enum AudioDemodMode:
+    ADM_FM_8KHZ = 0
+    ADM_FM_13KHZ = 1
+    ADM_FM_75KHZ = 2
+    ADM_FM_200KHZ = 3
+    ADM_AM_8KHZ = 4
+    
+cpdef enum StreamingMode:
+    StreamingModeRaw = 0
+    StreamingModeFramed = 1
+    
+cpdef enum IQSOUTDEST:
+    IQSOD_CLIENT = 0
+    IQSOD_FILE_TIQ = 1
+    IQSOD_FILE_SIQ = 2
+    IQSOD_FILE_SIQ_SPLIT = 3
 
+cpdef enum IQSOUTDTYPE:
+    IQSODT_SINGLE = 0
+    IQSODT_INT32 = 1
+    IQSODT_INT16 = 2
+    
+cpdef enum GNSS_SATSYS:
+    GNSS_NOSYS = 0
+    GNSS_GPS_GLONASS = 1
+    GNSS_GPS_BEIDOU = 2
+    GNSS_GPS = 3
+    GNSS_GLONASS = 4
+    GNSS_BEIDOU = 5
+
+    
 ##########################################################
 # Nameless Enums
 ##########################################################
+
+
 AcqDataStatus_ADC_OVERRANGE = 0x1
 AcqDataStatus_REF_OSC_UNLOCK = 0x2
 AcqDataStatus_LOW_SUPPLY_VOLTAGE = 0x10
@@ -182,6 +215,15 @@ def DEVICE_Connect_py(deviceID=0):
     cdef int _deviceID = deviceID
     err_check(DEVICE_Connect(_deviceID))
 
+
+def DEVICE_Disconnect_py():
+    err_check(DEVICE_Disconnect())
+    
+    
+def DEVICE_Reset_py(deviceID):
+    cdef int _deviceID = deviceID
+    err_check(DEVICE_Reset(_deviceID))
+    
     
 def DEVICE_GetOverTemperatureStatus_py():
     cdef bint tempStatus
@@ -673,8 +715,7 @@ def SPECTRUM_GetTrace_py(trace=SpectrumTraces.SpectrumTrace1, tracePoints=801):
     cdef np.ndarray traceData = np.empty(shape=(tracePoints), dtype=np.float32,
                                      order='c')
     cdef int outTracePoints
-    err_check(SPECTRUM_GetTrace(trace, _tracePoints, <float *> traceData.data, \
-    &outTracePoints))
+    err_check(SPECTRUM_GetTrace(trace, _tracePoints, <float *> traceData.data, &outTracePoints))
     return np.asarray(traceData, dtype=np.float32)
 
 
@@ -878,3 +919,320 @@ def DPX_GetSogramHiResLine_py(lineIndex=0):
     cdef int32_t firstValidPoint = 0
     err_check(DPX_GetSogramHiResLine(vData, &vDataSize, _lineIndex, &dataSF, tracePoints, firstValidPoint))
     return vData
+
+
+##########################################################
+# Audio Demod
+##########################################################
+
+
+def AUDIO_SetMode_py(mode):
+    err_check(AUDIO_SetMode(mode))
+
+
+def AUDIO_GetMode_py():
+    cdef int mode
+    err_check(AUDIO_GetMode(&mode))
+    return mode
+
+
+def AUDIO_SetVolume_py(volume):
+    cdef float _volume = volume
+    err_check(AUDIO_SetVolume(_volume))
+
+
+def AUDIO_GetVolume_py():
+    cdef float volume
+    err_check(AUDIO_GetVolume(&volume))
+    return volume
+
+
+def AUDIO_SetMute_py(mute):
+    cdef bint _mute = mute
+    err_check(AUDIO_SetMute(mute))
+    
+
+def AUDIO_GetMute_py():
+    cdef bint mute
+    err_check(AUDIO_GetMute(&mute))
+    return mute
+
+
+def AUDIO_SetFrequencyOffset_py(freqOffsetHz):
+    cdef double _freqOffsetHz = freqOffsetHz
+    err_check(AUDIO_SetFrequencyOffset(_freqOffsetHz))
+    
+    
+def AUDIO_GetFrequencyOffset_py():
+    cdef double freqOffsetHz
+    err_check(AUDIO_GetFrequencyOffset(&freqOffsetHz))
+    return freqOffsetHz
+
+
+def AUDIO_Start_py():
+    err_check(AUDIO_Start())
+    
+    
+def AUDIO_GetEnable_py():
+    cdef bint enable
+    err_check(AUDIO_GetEnable(&enable))
+    return enable
+
+# Error checking not working
+def AUDIO_GetData_py(inSize):
+    cdef uint16_t _inSize = inSize
+    cdef uint16_t outSize
+    cdef np.ndarray data = np.empty(shape=(inSize), dtype=np.int16, order='c')
+    err_check(AUDIO_GetData(<int16_t *> data.data, _inSize, &outSize))
+    # print(_inSize)
+    # print(outSize)
+    # if _inSize != outSize:
+    #     raise RSAError('# samples requested != # samples returned')
+    return data
+
+
+def AUDIO_Stop_py():
+    err_check(AUDIO_Stop())
+
+
+##########################################################
+# IF Streaming
+##########################################################
+
+
+def IFSTREAM_SetDiskFileMode_py(mode):
+    cdef int _mode = mode
+    err_check(IFSTREAM_SetDiskFileMode(mode))
+    
+    
+def IFSTREAM_SetDiskFilePath_py(path):
+    cdef char* _path = path
+    err_check(IFSTREAM_SetDiskFilePath(_path))
+    
+    
+def IFSTREAM_SetDiskFilenameBase_py(base):
+    cdef char* _base = base
+    err_check(IFSTREAM_SetDiskFilenameBase(base))
+    
+
+def IFSTREAM_SetDiskFilenameSuffix_py(suffixCtl):
+    cdef int _suffixCtl = suffixCtl
+    err_check(IFSTREAM_SetDiskFilenameSuffix(_suffixCtl))
+
+
+def IFSTREAM_SetDiskFileLength_py(msec):
+    cdef int _msec = msec
+    err_check(IFSTREAM_SetDiskFileLength(_msec))
+
+
+def IFSTREAM_SetDiskFileCount_py(count):
+    cdef int _count = count
+    err_check(IFSTREAM_SetDiskFileCount(count))
+    
+
+def IFSTREAM_SetEnable_py(enable):
+    cdef bint _enable = enable
+    err_check(IFSTREAM_SetEnable(enable))
+    
+
+def IFSTREAM_GetActiveStatus_py():
+    cdef bint active
+    err_check(IFSTREAM_GetActiveStatus(&active))
+    return active
+
+
+###########################################################
+# IQ Data Streaming to Client or Disk
+###########################################################
+
+
+def IQSTREAM_GetMinAcqBandwidth_py():
+    cdef double minBandwidthHz
+    err_check(IQSTREAM_GetMinAcqBandwidth(&minBandwidthHz))
+    return minBandwidthHz
+
+
+def IQSTREAM_GetMaxAcqBandwidth_py():
+    cdef double maxBandwidthHz
+    err_check(IQSTREAM_GetMaxAcqBandwidth(&maxBandwidthHz))
+    return maxBandwidthHz
+
+
+def IQSTREAM_SetAcqBandwidth_py(bwHz_req):
+    cdef double _bwHz_req = bwHz_req
+    err_check(IQSTREAM_SetAcqBandwidth(_bwHz_req))
+    
+    
+# This MUST be sent before IQSTREAM_Start() or the resulting file will be empty
+def IQSTREAM_GetAcqParameters_py():
+    cdef double bwHz_act
+    cdef double srSps
+    err_check(IQSTREAM_GetAcqParameters(&bwHz_act, &srSps))
+    return bwHz_act, srSps
+
+
+def IQSTREAM_SetOutputConfiguration_py(dest=IQSOUTDEST.IQSOD_FILE_SIQ,
+                                       dtype=IQSOUTDTYPE.IQSODT_INT16):
+    cdef IQSOUTDEST _dest = dest
+    cdef IQSOUTDTYPE _dtype = dtype
+    err_check(IQSTREAM_SetOutputConfiguration(_dest, _dtype))
+    
+
+def IQSTREAM_SetIQDataBufferSize_py(reqSize):
+    cdef int _reqSize = reqSize
+    err_check(IQSTREAM_SetIQDataBufferSize(_reqSize))
+    
+
+def IQSTREAM_GetIQDataBufferSize_py():
+    cdef int maxSize
+    err_check(IQSTREAM_GetIQDataBufferSize(&maxSize))
+    return maxSize
+    
+
+def IQSTREAM_SetDiskFilenameBase_py(filenameBase):
+    cdef char* _filenameBase = filenameBase
+    err_check(IQSTREAM_SetDiskFilenameBase(_filenameBase))
+    
+    
+def IQSTREAM_SetDiskFilenameSuffix_py(suffixCtl=IQSSDFN_SUFFIX_NONE):
+    cdef int _suffixCtl = suffixCtl
+    err_check(IQSTREAM_SetDiskFilenameSuffix(_suffixCtl))
+    
+
+def IQSTREAM_SetDiskFileLength_py(msec):
+    cdef int _msec = msec
+    err_check(IQSTREAM_SetDiskFileLength(_msec))
+    
+
+def IQSTREAM_Start_py():
+    err_check(IQSTREAM_Start())
+    
+
+def IQSTREAM_GetEnable_py():
+    cdef bint enable
+    err_check(IQSTREAM_GetEnable(&enable))
+    return enable
+    
+    
+def IQSTREAM_GetDiskFileWriteStatus_py():
+    cdef bint isComplete
+    cdef bint isWriting
+    err_check(IQSTREAM_GetDiskFileWriteStatus(&isComplete, &isWriting))
+    return isComplete, isWriting
+    
+    
+def IQSTREAM_Stop_py():
+    err_check(IQSTREAM_Stop())
+    
+
+# Can't be done with C pointers in Cython
+# def IQSTREAM_GetIQData_py():
+#     cdef void* iqData
+#     cdef int iqlen
+#     cdef IQSTRMIQINFO iqinfo
+#     err_check(IQSTREAM_GetIQData(iqData, &iqlen, &iqinfo))
+#     return iqData
+
+
+# def IQSTREAM_GetDiskFileInfo_py():
+#     cdef IQSTRMFILEINFO fileinfo
+#     err_check(IQSTREAM_GetFileInfo(&fileinfo))
+#     return fileinfo
+
+
+def IQSTREAM_ClearAcqStatus_py():
+    err_check(IQSTREAM_ClearAcqStatus())
+
+
+###########################################################
+# Stored IF Data File Playback
+###########################################################
+
+
+def PLAYBACK_OpenDiskFile_py(fileName, startPercentage, stopPercentage,
+                             skipTimeBetweenFullAcquisitions,
+                             loopAtEndOfFile, emulateRealTime):
+    cdef Py_UNICODE* _fileName = fileName
+    cdef int _startPercentage = startPercentage
+    cdef int _stopPercentage = stopPercentage
+    cdef double _skipTimeBetweenFullAcquisitions = skipTimeBetweenFullAcquisitions
+    cdef bint _loopAtEndOfFile = loopAtEndOfFile
+    cdef bint _emulateRealTime = emulateRealTime
+    err_check(PLAYBACK_OpenDiskFile(_fileName, _startPercentage,
+                                    _stopPercentage,
+                                    _skipTimeBetweenFullAcquisitions,
+                                    _loopAtEndOfFile, _emulateRealTime))
+    
+
+def PLAYBACK_GetReplayComplete_py():
+    cdef bint complete
+    err_check(PLAYBACK_GetReplayComplete(&complete))
+    return complete
+
+
+###########################################################
+# GNSS Rx Control and Output
+###########################################################
+
+
+def GNSS_GetHwInstalled_py():
+    cdef bint installed
+    err_check(GNSS_GetHwInstalled(&installed))
+    return installed
+
+
+def GNSS_GetSatSystem_py():
+    cdef int satSystem
+    err_check(GNSS_GetSatSystem(&satSystem))
+    return satSystem
+    
+
+def GNSS_SetSatSystem_py(satSystem):
+    cdef int _satSystem = satSystem
+    err_check(GNSS_SetSatSystem(_satSystem))
+    
+
+def GNSS_SetEnable_py(enable):
+    cdef bint _enable = enable
+    err_check(GNSS_SetEnable(_enable))
+
+
+def GNSS_GetEnable_py():
+    cdef bint enable
+    err_check(GNSS_GetEnable(&enable))
+    return enable
+    
+    
+def GNSS_SetAntennaPower_py(powered):
+    cdef bint _powered = powered
+    err_check(GNSS_SetAntennaPower(_powered))
+    
+def GNSS_GetAntennaPower_py():
+    cdef bint powered
+    err_check(GNSS_GetAntennaPower(&powered))
+    return powered
+    
+    
+def GNSS_GetNavMessageData_py():
+    cdef int msgLen
+    cdef char* message
+    err_check(GNSS_GetNavMessageData(&msgLen, &message))
+    return message
+    
+    
+def GNSS_Get1PPSTimestamp_py():
+    cdef bint isValid
+    cdef uint64_t timestamp1PPS
+    err_check(GNSS_Get1PPSTimestamp(&isValid, &timestamp1PPS))
+    return timestamp1PPS, isValid
+    
+
+###########################################################
+# Power and Battery Status
+###########################################################
+
+
+def POWER_GetStatus_py():
+    cdef POWER_INFO powerInfo
+    err_check(POWER_GetStatus(&powerInfo))
+    return powerInfo

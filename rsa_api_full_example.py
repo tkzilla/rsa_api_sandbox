@@ -84,7 +84,7 @@ def config_spectrum(cf=1e9, refLevel=0, span=40e6, rbw=300e3):
     rsa.SPECTRUM_SetEnable(c_bool(True))
     rsa.CONFIG_SetCenterFreq(c_double(cf))
     rsa.CONFIG_SetReferenceLevel(c_double(refLevel))
-
+    
     rsa.SPECTRUM_SetDefault()
     specSet = Spectrum_Settings()
     rsa.SPECTRUM_GetSettings(byref(specSet))
@@ -111,11 +111,12 @@ def acquire_spectrum(specSet):
     traceData = traceArray()
     outTracePoints = c_int(0)
     traceSelector = SpectrumTraces.SpectrumTrace1
-
+    
     rsa.DEVICE_Run()
     rsa.SPECTRUM_AcquireTrace()
     while not ready.value:
         rsa.SPECTRUM_WaitForDataReady(c_int(100), byref(ready))
+    print(query_device_status(DEVEVENT_OVERRANGE))
     rsa.SPECTRUM_GetTrace(traceSelector, specSet.traceLength, byref(traceData),
                           byref(outTracePoints))
     rsa.DEVICE_Stop()
@@ -126,7 +127,7 @@ def spectrum_example():
     print('\n\n########Spectrum Example########')
     search_connect()
     cf = 2.4453e9
-    refLevel = 0
+    refLevel = -20
     span = 40e6
     rbw = 10e3
     specSet = config_spectrum(cf, refLevel, span, rbw)
@@ -147,7 +148,7 @@ def spectrum_example():
     ax.set_xlim([freq[0], freq[-1]])
     ax.set_ylim([refLevel - 100, refLevel])
     plt.tight_layout()
-    plt.show()
+    # plt.show()
     rsa.DEVICE_Disconnect()
 
 
@@ -182,6 +183,7 @@ def acquire_block_iq(recordLength=10e3):
     rsa.IQBLK_AcquireIQData()
     while not ready.value:
         rsa.IQBLK_WaitForIQDataReady(c_int(100), byref(ready))
+    print(query_device_status(DEVEVENT_OVERRANGE))
     rsa.IQBLK_GetIQDataDeinterleaved(byref(iData), byref(qData),
                                      byref(c_int(outLength)), c_int(recordLength))
     rsa.DEVICE_Stop()
@@ -193,7 +195,7 @@ def block_iq_example():
     print('\n\n########Block IQ Example########')
     search_connect()
     cf = 2.4453e9
-    refLevel = 0
+    refLevel = -20
     iqBw = 40e6
     recordLength = 100000
 
@@ -542,6 +544,19 @@ def if_playback():
     print('Playback Complete: {}'.format((complete.value)))
 
 
+
+def trkgen_example(power):
+    inst = c_bool(False)
+    rsa.TRKGEN_GetHwInstalled(byref(inst))
+    rsa.TRKGEN_SetEnable(c_bool(True))
+    rsa.TRKGEN_SetOutputLevel(c_double(power))
+    en = c_bool(False)
+    rsa.TRKGEN_GetEnable(byref(en))
+    pw = c_double(-1024)
+    rsa.TRKGEN_GetOutputLevel(byref(pw))
+    print('Installed: {}, Enabled: {}, Power: {}'.format(inst, en, pw))
+
+
 """################MISC################"""
 def config_trigger(trigMode=TriggerMode.triggered, trigLevel=-10,
                    trigSource=TriggerSource.TriggerSourceIFPowerLevel):
@@ -556,6 +571,21 @@ def peak_power_detector(freq, trace):
     peakFreq = freq[np.argmax(trace)]
 
     return peakPower, peakFreq
+
+
+def query_device_status(event_id):
+    _event_id = c_int(event_id)
+    event_occurred = c_bool()
+    event_timestamp = c_uint64()
+    rsa.DEVICE_GetEventStatus(_event_id, byref(event_occurred),
+                              byref(event_timestamp))
+    return _event_id.value, event_occurred.value, event_timestamp.value
+
+
+def get_acq_info():
+    acqInfo = IQBLK_ACQINFO()
+    rsa.IQBLK_GetIQAcqInfo(byref(acqInfo))
+    return acqInfo
 
 
 def main():

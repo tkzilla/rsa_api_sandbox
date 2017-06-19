@@ -9,22 +9,22 @@ print('Number of devices: {}'.format(numDevicesFound))
 if numDevicesFound > 0:
     print('Device serial numbers: {}'.format(deviceSerial[0].decode()))
     print('Device type: {}'.format(deviceType[0].decode()))
-DEVICE_Connect_py(deviceIDs[0])
+    DEVICE_Connect_py(deviceIDs[0])
+else:
+    print('No devices found, exiting script.')
+    exit()
 
 devInfo = DEVICE_GetInfo_py()
-print(devInfo)
+print('Device Info: {}'.format(devInfo))
 
-# CONFIG_SetRFPreampEnable_py(True)
-# DEVICE_Run_py()
-# print(CONFIG_GetRFPreampEnable_py())
-#
-# TRIG_SetTriggerMode_py(TriggerMode.freeRun)
-# print(TRIG_GetTriggerMode_py())
-# TRIG_SetIFPowerTriggerLevel_py(-20)
-# print(TRIG_GetIFPowerTriggerLevel_py())
-#
-# print(ALIGN_GetAlignmentNeeded_py())
-# print(ALIGN_GetWarmupStatus_py())
+
+TRIG_SetTriggerMode_py(TriggerMode.freeRun)
+print(TRIG_GetTriggerMode_py())
+TRIG_SetIFPowerTriggerLevel_py(-20)
+print('Trigger level: {}'.format(TRIG_GetIFPowerTriggerLevel_py()))
+
+print(ALIGN_GetAlignmentNeeded_py())
+print(ALIGN_GetWarmupStatus_py())
 #
 # DEVICE_Run_py()
 # print(DEVICE_GetEnable_py())
@@ -42,6 +42,7 @@ CONFIG_Preset_py()
 CONFIG_SetCenterFreq_py(2.4453e9)
 CONFIG_SetReferenceLevel_py(0)
 print(CONFIG_GetCenterFreq_py())
+print(CONFIG_GetReferenceLevel_py())
 
 # print(IQBLK_GetMaxIQRecordLength_py())
 #
@@ -86,9 +87,15 @@ print(CONFIG_GetCenterFreq_py())
 # print(SPECTRUM_GetTraceType_py(0))
 # print(SPECTRUM_GetLimits_py())
 #
-# spectrum = SPECTRUM_Acquire_py(tracePoints=801)
+# # spectrum = SPECTRUM_Acquire_py(tracePoints=801)
+# DEVICE_Run_py()
+# SPECTRUM_AcquireTrace_py()
+# while not SPECTRUM_WaitForTraceReady_py(100):
+#     pass
 # print(SPECTRUM_GetTraceInfo_py())
-# #
+# print('Event Status: {}'.format(DEVICE_GetEventStatus_py(DEVEVENT_OVERRANGE)))
+# spectrum = SPECTRUM_GetTrace_py(SpectrumTraces.SpectrumTrace1, 801)
+#
 # plt.figure(1, figsize=(15, 10))
 # ax = plt.subplot(111, facecolor='k')
 # ax.plot(spectrum, color='y')
@@ -97,40 +104,6 @@ print(CONFIG_GetCenterFreq_py())
 # ax.set_ylabel('Amplitude (dBm)')
 # plt.tight_layout()
 # plt.show()
-
-# DPX_SetEnable_py(True)
-# # print(DPX_GetEnable_py())
-# DPX_Reset_py()
-#
-# fspan = 20e6
-# rbw = 100e3
-# tracePtsPerPixel = 1
-# yUnit = 0#VerticalUnitType.VerticalUnit_dBm
-# yTop = 0
-# yBottom = yTop - 100
-# infinitePersistence = False
-# persistenceTimeSec = 1
-# showOnlyTrigFrame = False
-# DPX_SetParameters_py(fspan, rbw, tracePtsPerPixel, yUnit, yTop,
-#                      infinitePersistence, persistenceTimeSec,
-#                      showOnlyTrigFrame)
-# DPX_Configure_py()
-# # DPX_SetSpectrumTraceType_py()
-# print(DPX_GetSettings_py())
-# # print(DPX_GetRBWRange_py())
-#
-# DEVICE_Run_py()
-# ready = False
-# avail = False
-# while avail == False:
-#     avail = DPX_IsFrameBufferAvailable_py()
-# while ready == False:
-#     ready = DPX_WaitForDataReady_py()
-# print('tis avail and ready')
-# fb = DPX_GetFrameBuffer_py()
-# print(fb.keys())
-# print(max(fb['spectrumBitmap']))
-# print(max(fb['sogramBitmap']))
 
 fspan = 40e6
 rbw = 100e3
@@ -147,41 +120,7 @@ DPX_SetSpectrumTraceType_py(0, 1)
 DPX_SetParameters_py(fspan, rbw, tracePtsPerPixel, yUnit, yTop, yBottom,
                      infinitePersistence, persistenceTimeSec, showOnlyTrigFrame)
 print(DPX_GetSettings_py())
-# DEVICE_Run_py()
-# while not DPX_IsFrameBufferAvailable_py():
-#     pass
-# while not DPX_WaitForDataReady_py():
-#     pass
-# fb = DPX_GetFrameBuffer_py()
-
 fb = DPX_AcquireFB_py()
-#
-#
-# print(max(fb['spectrumBitmap']))
-# dpxBitmap = np.asarray(fb['spectrumBitmap'])
-# dpxBitmap = dpxBitmap.reshape((fb['spectrumBitmapHeight'],
-#                                fb['spectrumBitmapWidth']))
-#
-# print(type(fb['spectrumTraces']))
-# print(type(fb['spectrumTraces'][0]))
-# print(len(fb['spectrumTraces']))
-# print(len(fb['spectrumTraces'][0]))
-# print(np.shape(fb['spectrumTraces']))
-# # You can only index/slice a Cython array after converting to a np.array
-# # traces = []
-# # for i in range(3):
-# #     traces.append(10 * np.log10(1000 * np.asarray(
-# #         fb['spectrumTraces'][i], order='c')[:fb['spectrumTraceLength']]) + 30)
-#
-# """The Cython typedef of uint8_t is an unsigned char. Because
-# DPX_FrameBuffer.sogramBitmap is defined as a uint8_t*
-# Python interprets, the returned value as a string. Fortunately
-# Numpy has the .fromstring() method that interprets the string as
-# numerical values."""
-# dpxogram = np.fromstring(fb['sogramBitmap'], dtype=np.uint8)
-# dpxogram = dpxogram.reshape((
-#     fb['sogramBitmapHeight'], fb['sogramBitmapWidth']))[
-#            :fb['sogramBitmapNumValidLines']]
 
 fig = plt.figure()
 ax1 = fig.add_subplot(131)
@@ -195,3 +134,31 @@ ax3.imshow(fb.sogramBitmap, cmap='gist_stern')
 ax3.set_aspect(7)
 plt.tight_layout()
 plt.show()
+#
+#
+# AUDIO_SetMode_py(3)
+# print(AUDIO_GetMode_py())
+# AUDIO_SetVolume_py(0.5)
+# print(AUDIO_GetVolume_py())
+# AUDIO_SetMute_py(False)
+# print(AUDIO_GetMute_py())
+#
+# DEVICE_Run_py()
+# AUDIO_Start_py()
+# print(AUDIO_GetEnable_py())
+# inSize = 1000
+# data = AUDIO_GetData_py(inSize)
+# plt.plot(data)
+# plt.show()
+
+# IFSTREAM_SetDiskFileMode_py(StreamingMode.StreamingModeFramed)
+# IFSTREAM_SetDiskFilePath_py(b'C:\\SignalVu-PC Files\\garbage\\')
+# IFSTREAM_SetDiskFilenameBase_py(b'if_stream_test')
+# IFSTREAM_SetDiskFilenameSuffix_py(IFSSDFN_SUFFIX_NONE)
+# IFSTREAM_SetDiskFileLength_py(100)
+# IFSTREAM_SetDiskFileCount_py(1)
+# DEVICE_Run_py()
+# IFSTREAM_SetEnable_py(True)
+# while not IFSTREAM_GetActiveStatus_py():
+#     pass
+
