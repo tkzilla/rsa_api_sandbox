@@ -1,7 +1,6 @@
 from pickle import load
-import numpy as np
-import matplotlib.pyplot as plt
-from classifier import *
+
+from Classifier.classifier import *
 
 with open('C:\\users\\mallison\\Documents\\GitHub\\RSA_API-Python-3.5\\error_traces.pickle', 'rb') as f:
 	errors = load(f)

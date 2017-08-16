@@ -1,19 +1,13 @@
 """
 Tektronix RSA_API Example
-Author: Morgan Allison
-Date created: 6/15
-Date edited: 2/17
+Date edited: 7/17
 Windows 7 64-bit
 RSA API version 3.9.0029
-Python 3.6.0 64-bit (Anaconda 4.3.0)
+Python 3.6.1 64-bit (Anaconda 4.3.0)
 NumPy 1.11.3, MatPlotLib 2.0.0
 Download Anaconda: http://continuum.io/downloads
 Anaconda includes NumPy and MatPlotLib
 Download the RSA_API: http://www.tek.com/model/rsa306-software
-Download the RSA_API Documentation:
-http://www.tek.com/spectrum-analyzer/rsa306-manual-6
-
-YOU WILL NEED TO REFERENCE THE API DOCUMENTATION
 """
 
 from ctypes import *
@@ -22,8 +16,8 @@ from time import sleep
 import numpy as np
 import matplotlib.pyplot as plt
 from RSA_API import *
-import winsound, pyglet
-import scipy.io.wavfile
+# import winsound, pyglet
+# import scipy.io.wavfile
 
 
 # C:\Tektronix\RSA_API\lib\x64 needs to be added to the
@@ -50,6 +44,7 @@ def search_connect():
 
     err_check(rsa.DEVICE_Search(byref(numFound), deviceIDs,
                                 deviceSerial, deviceType))
+
 
     if numFound.value < 1:
         # rsa.DEVICE_Reset(c_int(0))
@@ -116,7 +111,7 @@ def acquire_spectrum(specSet):
     rsa.SPECTRUM_AcquireTrace()
     while not ready.value:
         rsa.SPECTRUM_WaitForDataReady(c_int(100), byref(ready))
-    print(query_device_status(DEVEVENT_OVERRANGE))
+    # # print(query_device_status(DEVEVENT_OVERRANGE))
     rsa.SPECTRUM_GetTrace(traceSelector, specSet.traceLength, byref(traceData),
                           byref(outTracePoints))
     rsa.DEVICE_Stop()
@@ -148,7 +143,7 @@ def spectrum_example():
     ax.set_xlim([freq[0], freq[-1]])
     ax.set_ylim([refLevel - 100, refLevel])
     plt.tight_layout()
-    # plt.show()
+    plt.show()
     rsa.DEVICE_Disconnect()
 
 
@@ -183,7 +178,7 @@ def acquire_block_iq(recordLength=10e3):
     rsa.IQBLK_AcquireIQData()
     while not ready.value:
         rsa.IQBLK_WaitForIQDataReady(c_int(100), byref(ready))
-    print(query_device_status(DEVEVENT_OVERRANGE))
+    # # print(query_device_status(DEVEVENT_OVERRANGE))
     rsa.IQBLK_GetIQDataDeinterleaved(byref(iData), byref(qData),
                                      byref(c_int(outLength)), c_int(recordLength))
     rsa.DEVICE_Stop()

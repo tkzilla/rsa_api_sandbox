@@ -110,9 +110,12 @@ def block_iq_example():
     print('\n\n########Block IQ Example########')
     search_connect()
     cf = 2.4453e9
+    # cf = 100e6
     refLevel = 0
     iqBw = 40e6
-    recordLength = 100000
+    recordLength = 1000
+
+    # TRIG_SetTriggerMode_py()
 
     time = config_block_iq(cf, refLevel, iqBw, recordLength)
     IQ = IQBLK_Acquire_py(recordLength=recordLength)
@@ -229,12 +232,15 @@ def peak_power_detector(freq, trace):
 
     return peakPower, peakFreq
 
+
+def channel_power(trace):
+    pass
+
 def main():
     # uncomment the example you'd like to run
-    spectrum_example()
-    block_iq_example()
-    dpx_example()
-    
+    # spectrum_example()
+    # block_iq_example()
+    # dpx_example()
 
 if __name__ == '__main__':
     main()
